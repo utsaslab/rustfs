@@ -10,6 +10,12 @@
 cmake_minimum_required(VERSION 2.8)
 project(rustfs)
 
+# This project can use C11, but will gracefully decay down to C89.
+set(CMAKE_C_STANDARD 11)
+set(CMAKE_C_STANDARD_REQUIRED OFF)
+set(CMAKE_C_EXTENSIONS OFF)
+
+# Let CMake know where to search for the commonly-used CMake macros
 set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/CMakeModules)
 
 # SPDK_DIR should point to the install location of the SPDK library

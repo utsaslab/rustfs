@@ -87,5 +87,7 @@ target_link_libraries(hello_nvme_bdev
         -Wl,--whole-archive ${SG4} -Wl,--no-whole-archive
         ${SG5}
         -Wl,--start-group -Wl,--whole-archive ${DG1} -Wl,--end-group
+        # TODO: (hzy) the following line can be improved by doing the library detection in the cmake and set the
+        # value corresponding in a config.h. Similar towards LevelDB's style.
         -Wl,--no-whole-archive -lnuma -ldl -lrt -luuid -lcrypto
         )
