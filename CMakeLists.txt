@@ -10,6 +10,9 @@
 cmake_minimum_required(VERSION 2.8)
 project(rustfs)
 
+# We enable the verbose output to help with debug building process
+set( CMAKE_VERBOSE_MAKEFILE  on )
+
 # This project can use C11, but will gracefully decay down to C89.
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED OFF)
@@ -54,4 +57,4 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} \
 # include the SPDK API headers
 include_directories(${SPDK_DIR}/include)
 
-add_subdirectory(examples)
+add_subdirectory(examples/hello_nvme_bdev)
