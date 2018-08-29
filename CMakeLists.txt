@@ -54,4 +54,4 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} \
 # include the SPDK API headers
 include_directories(${SPDK_DIR}/include)
 
-add_subdirectory(examples)
+add_subdirectory(examples/hello_nvme_bdev)

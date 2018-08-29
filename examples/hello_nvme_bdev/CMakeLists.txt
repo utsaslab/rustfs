@@ -18,7 +18,7 @@ include(Macros)
 
 ### TARGET: hello_nvme_bdev
 add_executable(hello_nvme_bdev
-        hello_nvme_bdev/hello_nvme_bdev.c
+        hello_nvme_bdev.c
         )
 
 spdk_lib_list_to_files(SG1
