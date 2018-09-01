@@ -4,9 +4,9 @@ use std::env;
 use std::path::PathBuf;
 
 fn main() {
-    let spdk_dir = match env::var_os("SPDK_DIR") {
-        Some(val) => val.into_string().unwrap(),
-        None => panic!("SPDK_DIR is not defined in the environment")
+    let spdk_dir = match env::var("SPDK_DIR") {
+        Ok(val) => val,
+        Err(_e) => panic!("SPDK_DIR is not defined in the environment")
     };
     let include_path = format!("-I{}/include", spdk_dir);
 

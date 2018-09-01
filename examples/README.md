@@ -6,4 +6,5 @@ This directory contains example programs utilize the [SPDK](http://www.spdk.io/d
     
 - `hello_nvme_bdev_rust`
 
-    A rust program that utilizes the rust
+    Same functionality as `hello_nvme_bdev` but written in Rust with the rust bindings
+    from rust-spdk directory
