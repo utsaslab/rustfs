@@ -10,6 +10,9 @@
 cmake_minimum_required(VERSION 2.8)
 project(rustfs)
 
+# We enable the verbose output to help with debug building process
+set( CMAKE_VERBOSE_MAKEFILE  on )
+
 # This project can use C11, but will gracefully decay down to C89.
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED OFF)

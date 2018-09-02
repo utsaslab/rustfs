@@ -3,9 +3,5 @@ name = "rust-spdk"
 version = "0.1.0"
 authors = ["xxks-kkk <ferrishu3886@gmail.com>"]
 
-[dependencies]
-libc = "0.2"
-
-
 [build-dependencies]
 bindgen = "0.35.0"
