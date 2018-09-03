@@ -38,6 +38,4 @@ fn main() {
     bindings
         .write_to_file(out_path.join("bindings.rs"))
         .expect("Couldn't write bindings!");
-
-    // Link to the necessary libs to compile `hello_nvme_bdev`
 }
