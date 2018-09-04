@@ -4,49 +4,40 @@
 
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
-#[cfg(test)]
-mod tests {
-    // We want to be able to access Rust FFI structs inside
-    // bindings.rs
-    use super::*;
-    //    use std::io::prelude::*;
-    use std::ffi::CString;
-    use std::ptr;
-    use std::os::raw::{c_void, c_char, c_int};
+//    use std::io::prelude::*;
+use std::ffi::CString;
+use std::ptr;
+use std::os::raw::{c_void, c_char, c_int};
 
-    /// This program achieves the same functionality as `hello_nvme_bdev.c`
-    /// inside the examples/hello_nvme_bdev directory. However, we hardcode the bdev name. Please
-    /// adjust if necessary.
-    #[test]
-    fn hello_nvme_bdev() {
-        println!("Enter hello_nvme_bdev");
-        main();
+fn main() {
+    println!("Enter hello_nvme_bdev");
+    main();
 
-        #[repr(C)]
-        #[derive(Debug)]
-        struct hello_context_t {
-            bdev: *mut spdk_bdev,
-            bdev_desc: *mut spdk_bdev_desc,
-            bdev_io_channel: *mut spdk_io_channel,
-            buff: *mut c_char,
-            bdev_name: *const c_char,
-        }
+    #[repr(C)]
+    #[derive(Debug)]
+    struct hello_context_t {
+        bdev: *mut spdk_bdev,
+        bdev_desc: *mut spdk_bdev_desc,
+        bdev_io_channel: *mut spdk_io_channel,
+        buff: *mut c_char,
+        bdev_name: *const c_char,
+    }
 
-        impl hello_context_t {
-            fn default() -> hello_context_t {
-                hello_context_t {
-                    bdev: ptr::null_mut(),
-                    bdev_desc: ptr::null_mut(),
-                    bdev_io_channel: ptr::null_mut(),
-                    buff: ptr::null_mut(),
-                    bdev_name: CString::new("Nvme0n1").unwrap().as_ptr(),
-                }
+    impl hello_context_t {
+        fn default() -> hello_context_t {
+            hello_context_t {
+                bdev: ptr::null_mut(),
+                bdev_desc: ptr::null_mut(),
+                bdev_io_channel: ptr::null_mut(),
+                buff: ptr::null_mut(),
+                bdev_name: CString::new("Nvme0n1").unwrap().as_ptr(),
             }
         }
+    }
 
-        fn hello_bdev_usage() {
-            println!(" -b <bdev>                 name of the bdev to use");
-        }
+    fn hello_bdev_usage() {
+        println!(" -b <bdev>                 name of the bdev to use");
+    }
 
 //        fn read_complete(bdev_io: *mut spdk_bdev_io,
 //                         success: bool,
@@ -107,8 +98,8 @@ mod tests {
 //            }
 //        }
 
-        extern "C" fn hello_start(_arg1: *mut c_void, _arg2: *mut c_void) {
-            println!("Enter hello_start");
+    extern "C" fn hello_start(_arg1: *mut c_void, _arg2: *mut c_void) {
+        println!("Enter hello_start");
 //            let mut hello_context = arg1;
 //            let mut blk_size: u32;
 //            let mut buf_align: u32;
@@ -173,39 +164,40 @@ mod tests {
 //                    return;
 //                }
 //            };
+    }
+
+    fn main() -> std::os::raw::c_int {
+        println!("Enter main");
+
+        let mut opts: spdk_app_opts;
+        unsafe {
+            opts = std::mem::uninitialized();
+            spdk_app_opts_init(&mut opts);
         }
 
-        fn main() -> std::os::raw::c_int {
-            println!("Enter main");
+        let mut rc: c_int = 0;
+        let mut hello_context: hello_context_t = hello_context_t::default();
 
-            let mut opts: spdk_app_opts;
-            unsafe {
-                opts = std::mem::uninitialized();
-                spdk_app_opts_init(&mut opts);
-            }
+        opts.name = CString::new("hello_bdev").unwrap().as_ptr();
+        // TODO: hzy: there is a bug that config_file is not properly initialized
+        opts.config_file = CString::new("bdev.conf").unwrap().as_ptr();
 
-            let mut rc: c_int = 0;
-            let mut hello_context: hello_context_t = hello_context_t::default();
+        // TODO: hzy: see above
+        hello_context.bdev_name = CString::new("Nvme0n1").unwrap().as_ptr();
 
-            opts.name = CString::new("hello_bdev").unwrap().as_ptr();
-            opts.config_file = CString::new("bdev.conf").unwrap().as_ptr();
+        let hello_context_ptr: *mut c_void = &mut hello_context as *mut _ as *mut c_void;
+        // TODO: hzy: since the config_file is not properly initialized, the program will crash here.
+        rc = unsafe { spdk_app_start(&mut opts, Some(hello_start), hello_context_ptr, ptr::null_mut()) };
+        if rc != 0 {
+            panic!("ERROR starting application");
+        }
 
-            hello_context.bdev_name = CString::new("Nvme0n1").unwrap().as_ptr();
-
-            let hello_context_ptr: *mut c_void = &mut hello_context as *mut _ as *mut c_void;
-            rc = unsafe { spdk_app_start(&mut opts, Some(hello_start), hello_context_ptr, ptr::null_mut()) };
-            if rc != 0 {
-                panic!("ERROR starting application");
-            }
-
-            // hzy: here we still call free method, which still looks like C. Doing this
-            // doesn't utilize the Rust ownership feature.
+        // hzy: here we still call free method, which still looks like C. Doing this
+        // doesn't utilize the Rust ownership feature.
 //            spdk_dma_free(hello_context.buff);
 
-            unsafe { spdk_app_fini() };
+        unsafe { spdk_app_fini() };
 
-            return rc;
-        }
+        return rc;
     }
 }
-
