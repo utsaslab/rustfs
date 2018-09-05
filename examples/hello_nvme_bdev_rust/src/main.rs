@@ -7,34 +7,41 @@ include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 extern crate libc;
 
 //    use std::io::prelude::*;
-use std::ffi::{CString};
+use std::ffi::{CString, CStr};
 use std::ptr;
 use std::os::raw::{c_void, c_char, c_int};
 
+#[derive(Debug)]
+struct hello_context_t {
+    bdev: *mut spdk_bdev,
+    bdev_desc: *mut spdk_bdev_desc,
+    bdev_io_channel: *mut spdk_io_channel,
+    buff: *mut c_char,
+    bdev_name: *const c_char,
+}
 
 fn hello_bdev_usage() {
     println!(" -b <bdev>                 name of the bdev to use");
 }
 
 extern "C" fn hello_start(_arg1: *mut c_void, _arg2: *mut c_void) {
-    println!("Enter hello_start");
-//            let mut hello_context = arg1;
-//            let mut blk_size: u32;
-//            let mut buf_align: u32;
-//            let mut rc: int = 0;
-//            hello_context.bdev = None;
-//            hello_context.bdev_desc = None;
-//
-//            println!("Successfully started the application");
-//
-//            hello_context.bdev = match spdk_bdev_get_by_name(hello_context.bdev_name) {
-//                Some(val) => val,
-//                None => {
-//                    println!("Could not find the bdev {}", hello_context.bdev_name);
-//                    spdk_app_stop(-1);
-//                    return;
-//                }
-//            };
+    let hello_context: *mut hello_context_t = unsafe { _arg1 as *mut hello_context_t };
+    let mut blk_size: u32;
+    let mut buf_align: u32;
+    let mut rc: c_int = 0;
+    unsafe { (*hello_context).bdev = ptr::null_mut(); }
+    unsafe { (*hello_context).bdev_desc = ptr::null_mut(); }
+
+    println!("Successfully started the application");
+
+    unsafe {
+        (*hello_context).bdev = spdk_bdev_get_by_name((*hello_context).bdev_name);
+        if (*hello_context).bdev.is_null() {
+            println!("Could not find the bdev {}", CStr::from_ptr((*hello_context).bdev_name).to_str().unwrap());
+            spdk_app_stop(-1);
+            return;
+        }
+    }
 //
 //            println!("Opening io channel");
 //
@@ -85,14 +92,6 @@ extern "C" fn hello_start(_arg1: *mut c_void, _arg2: *mut c_void) {
 }
 
 fn main() {
-    #[derive(Debug)]
-    struct hello_context_t {
-        bdev: *mut spdk_bdev,
-        bdev_desc: *mut spdk_bdev_desc,
-        bdev_io_channel: *mut spdk_io_channel,
-        buff: *mut c_char,
-        bdev_name: *const c_char,
-    }
 
 
 //        fn read_complete(bdev_io: *mut spdk_bdev_io,
@@ -174,7 +173,7 @@ fn main() {
     hello_context.bdev_name = owned_bdev_name.as_ptr();
 
     let hello_context_ptr: *mut c_void = &mut hello_context as *mut _ as *mut c_void;
-    let rc : c_int = unsafe { spdk_app_start(&mut opts, Some(hello_start), hello_context_ptr, ptr::null_mut()) };
+    let rc: c_int = unsafe { spdk_app_start(&mut opts, Some(hello_start), hello_context_ptr, ptr::null_mut()) };
     if rc != 0 {
         panic!("ERROR starting application");
     }
