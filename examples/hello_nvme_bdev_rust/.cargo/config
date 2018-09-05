@@ -28,10 +28,9 @@ rustflags = [
      "-C", "link-arg=/home/zeyuanhu/spdk_install/lib/libspdk_env_dpdk.a",
      "-C", "link-arg=/home/zeyuanhu/spdk_install/lib/libspdk_util.a",
      "-C", "link-args=-Wl,--start-group -Wl,--whole-archive /home/zeyuanhu/dpdk_install/lib/librte_eal.a /home/zeyuanhu/dpdk_install/lib/librte_mempool.a /home/zeyuanhu/dpdk_install/lib/librte_ring.a /home/zeyuanhu/dpdk_install/lib/librte_mempool_ring.a /home/zeyuanhu/dpdk_install/lib/librte_pci.a /home/zeyuanhu/dpdk_install/lib/librte_bus_pci.a /home/zeyuanhu/dpdk_install/lib/librte_kvargs.a -Wl,--end-group -Wl,--no-whole-archive",
-
-    "-C", "link-arg=-l", "-C", "link-arg=numa",
-    "-C", "link-arg=-l", "-C", "link-arg=dl",
-    "-C", "link-arg=-l", "-C", "link-arg=rt",
-    "-C", "link-arg=-l", "-C", "link-arg=uuid",
-    "-C", "link-arg=-l", "-C", "link-arg=crypto"
+     "-C", "link-arg=-l", "-C", "link-arg=numa",
+     "-C", "link-arg=-l", "-C", "link-arg=dl",
+     "-C", "link-arg=-l", "-C", "link-arg=rt",
+     "-C", "link-arg=-l", "-C", "link-arg=uuid",
+     "-C", "link-arg=-l", "-C", "link-arg=crypto"
 ]

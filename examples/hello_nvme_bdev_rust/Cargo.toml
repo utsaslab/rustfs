@@ -5,3 +5,6 @@ authors = ["xxks-kkk <ferrishu3886@gmail.com>"]
 
 [build-dependencies]
 bindgen = "0.35.0"
+
+[dependencies]
+libc = "0.2"
