@@ -35,6 +35,21 @@ extern "C" fn hello_start(_arg1: *mut c_void, _arg2: *mut c_void) {
     println!("Successfully started the application");
 
     unsafe {
+        println!("Try to get a list of bdev ... ");
+        let mut first : *mut spdk_bdev = spdk_bdev_first();
+        while !first.is_null() {
+            let owned_fmt = CString::new("bdev name: %s\n").unwrap();
+            let fmt: *const c_char = owned_fmt.as_ptr();
+            libc::printf(fmt, (*first).name);
+            first = spdk_bdev_next(first);
+        }
+    }
+
+    unsafe {
+        let owned_fmt = CString::new("hello_context.bdev_name %s\n").unwrap();
+        let fmt: *const c_char = owned_fmt.as_ptr();
+        libc::printf(fmt, (*hello_context).bdev_name);
+
         (*hello_context).bdev = spdk_bdev_get_by_name((*hello_context).bdev_name);
         if (*hello_context).bdev.is_null() {
             println!("Could not find the bdev {}", CStr::from_ptr((*hello_context).bdev_name).to_str().unwrap());

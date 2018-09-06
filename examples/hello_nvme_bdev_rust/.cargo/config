@@ -2,35 +2,5 @@
 rustflags = [
      # all possible values similar to "link-arg" can be seen `rustc -C help`
      # detailed rustc doc: https://www.mankier.com/1/rustc
-     "-C", "link-arg=-rdynamic",
-     "-C", "link-arg=-L", "-C", "link-arg=/home/zeyuanhu/spdk_install/lib",
-     "-C", "link-arg=-L", "-C", "link-arg=/home/zeyuanhu/dpdk_install/lib",
-     "-C", "link-args=-Wl,-rpath,/home/zeyuanhu/spdk_install/lib:/home/zeyuanhu/dpdk_install/lib",
-     "-C", "link-args=-Wl,-z,relro,-z,now",
-     "-C", "link-args=-Wl,-z,noexecstack",
-     "-C", "link-args=-pthread",
-     "-C", "link-args=-Wl,--whole-archive /home/zeyuanhu/spdk_install/lib/libspdk_copy_ioat.a /home/zeyuanhu/spdk_install/lib/libspdk_ioat.a -Wl,--no-whole-archive",
-     "-C", "link-args=-Wl,--whole-archive /home/zeyuanhu/spdk_install/lib/libspdk_vbdev_lvol.a /home/zeyuanhu/spdk_install/lib/libspdk_blob.a /home/zeyuanhu/spdk_install/lib/libspdk_blob_bdev.a /home/zeyuanhu/spdk_install/lib/libspdk_lvol.a /home/zeyuanhu/spdk_install/lib/libspdk_bdev_malloc.a /home/zeyuanhu/spdk_install/lib/libspdk_bdev_null.a /home/zeyuanhu/spdk_install/lib/libspdk_bdev_nvme.a /home/zeyuanhu/spdk_install/lib/libspdk_nvme.a /home/zeyuanhu/spdk_install/lib/libspdk_vbdev_passthru.a /home/zeyuanhu/spdk_install/lib/libspdk_vbdev_error.a /home/zeyuanhu/spdk_install/lib/libspdk_vbdev_gpt.a /home/zeyuanhu/spdk_install/lib/libspdk_vbdev_split.a /home/zeyuanhu/spdk_install/lib/libspdk_bdev_aio.a /home/zeyuanhu/spdk_install/lib/libspdk_bdev_virtio.a /home/zeyuanhu/spdk_install/lib/libspdk_virtio.a -Wl,--no-whole-archive",
-     "-C", "link-arg=-l", "-C", "link-arg=aio",
-     "-C", "link-args=-Wl,--whole-archive /home/zeyuanhu/spdk_install/lib/libspdk_sock.a /home/zeyuanhu/spdk_install/lib/libspdk_sock_posix.a -Wl,--no-whole-archive",
-     "-C", "link-args=-Wl,--whole-archive /home/zeyuanhu/spdk_install/lib/libspdk_event_bdev.a /home/zeyuanhu/spdk_install/lib/libspdk_event_copy.a -Wl,--no-whole-archive",
-     "-C", "link-arg=/home/zeyuanhu/spdk_install/lib/libspdk_bdev.a",
-     "-C", "link-arg=/home/zeyuanhu/spdk_install/lib/libspdk_copy.a",
-     "-C", "link-arg=/home/zeyuanhu/spdk_install/lib/libspdk_event.a",
-     "-C", "link-arg=/home/zeyuanhu/spdk_install/lib/libspdk_thread.a",
-     "-C", "link-arg=/home/zeyuanhu/spdk_install/lib/libspdk_util.a",
-     "-C", "link-arg=/home/zeyuanhu/spdk_install/lib/libspdk_conf.a",
-     "-C", "link-arg=/home/zeyuanhu/spdk_install/lib/libspdk_trace.a",
-     "-C", "link-arg=/home/zeyuanhu/spdk_install/lib/libspdk_log.a",
-     "-C", "link-arg=/home/zeyuanhu/spdk_install/lib/libspdk_jsonrpc.a",
-     "-C", "link-arg=/home/zeyuanhu/spdk_install/lib/libspdk_json.a",
-     "-C", "link-arg=/home/zeyuanhu/spdk_install/lib/libspdk_rpc.a",
-     "-C", "link-arg=/home/zeyuanhu/spdk_install/lib/libspdk_env_dpdk.a",
-     "-C", "link-arg=/home/zeyuanhu/spdk_install/lib/libspdk_util.a",
-     "-C", "link-args=-Wl,--start-group -Wl,--whole-archive /home/zeyuanhu/dpdk_install/lib/librte_eal.a /home/zeyuanhu/dpdk_install/lib/librte_mempool.a /home/zeyuanhu/dpdk_install/lib/librte_ring.a /home/zeyuanhu/dpdk_install/lib/librte_mempool_ring.a /home/zeyuanhu/dpdk_install/lib/librte_pci.a /home/zeyuanhu/dpdk_install/lib/librte_bus_pci.a /home/zeyuanhu/dpdk_install/lib/librte_kvargs.a -Wl,--end-group -Wl,--no-whole-archive",
-     "-C", "link-arg=-l", "-C", "link-arg=numa",
-     "-C", "link-arg=-l", "-C", "link-arg=dl",
-     "-C", "link-arg=-l", "-C", "link-arg=rt",
-     "-C", "link-arg=-l", "-C", "link-arg=uuid",
-     "-C", "link-arg=-l", "-C", "link-arg=crypto"
+     "-C", "link-arg=/home/zeyuanhu/spdk/build/lib/libspdk.so"
 ]

@@ -4,16 +4,17 @@ use std::env;
 use std::path::PathBuf;
 
 fn main() {
-    let _spdk_dir = match env::var("SPDK_DIR") {
-        Ok(val) => val,
-        Err(_e) => panic!("SPDK_DIR is not defined in the environment")
-    };
-    let _dpdk_dir = match env::var("DPDK_DIR") {
-        Ok(val) => val,
-        Err(_e) => panic!("DPDK_DIR is not defined in the environment")
-    };
+//    let _spdk_dir = match env::var("SPDK_DIR") {
+//        Ok(val) => val,
+//        Err(_e) => panic!("SPDK_DIR is not defined in the environment")
+//    };
+//    let _dpdk_dir = match env::var("DPDK_DIR") {
+//        Ok(val) => val,
+//        Err(_e) => panic!("DPDK_DIR is not defined in the environment")
+//    };
 
-    let include_path_spdk_dir = format!("-I{}/include", _spdk_dir);
+//    let include_path_spdk_dir = format!("-I{}/include", _spdk_dir);
+    let include_path_spdk_dir = "-I/home/zeyuanhu/spdk_install/include";
 
     // The bindgen::Builder is the main entry point
     // to bindgen, and lets you build up options for
@@ -40,4 +41,5 @@ fn main() {
         .expect("Couldn't write bindings!");
 
     println!("cargo:rerun-if-changed=./build.rs");
+    println!("cargo:rerun-if-changed=src/wrapper.h");
 }
