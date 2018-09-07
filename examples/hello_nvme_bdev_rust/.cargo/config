@@ -2,5 +2,12 @@
 rustflags = [
      # all possible values similar to "link-arg" can be seen `rustc -C help`
      # detailed rustc doc: https://www.mankier.com/1/rustc
+     # We link library here instead of doing following in build.rs:
+     #     println!("cargo:rustc-link-search=/home/zeyuanhu/spdk/build/lib/");
+     #     println!("cargo:rustc-link-lib=dylib=spdk");
+     # because the program has to run in sudo and somehow cargo cannot find
+     # the dynamic library path under sudo. Probably will find a better way to solve the issue.
+     # Possible fixes:
+     # - We ship a setup script to perform variable substitution here (e.g. link-arg=$SPDK_LIB_DIR/libspdk.so)
      "-C", "link-arg=/home/zeyuanhu/spdk/build/lib/libspdk.so"
 ]

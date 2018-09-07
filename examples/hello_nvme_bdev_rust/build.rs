@@ -4,17 +4,14 @@ use std::env;
 use std::path::PathBuf;
 
 fn main() {
-//    let _spdk_dir = match env::var("SPDK_DIR") {
-//        Ok(val) => val,
-//        Err(_e) => panic!("SPDK_DIR is not defined in the environment")
-//    };
-//    let _dpdk_dir = match env::var("DPDK_DIR") {
-//        Ok(val) => val,
-//        Err(_e) => panic!("DPDK_DIR is not defined in the environment")
-//    };
+    // hzy: Don't use SPDK_DIR as environment variable here as SPDK 18.07 rely on this variable to
+    // build (i.e. will fail the SPDK build if we use the same environment variable here)
+    let _spdk_install_dir = match env::var("SPDK_INSTALL_DIR") {
+        Ok(val) => val,
+        Err(_e) => panic!("SPDK_INSTALL_DIR is not defined in the environment")
+    };
 
-//    let include_path_spdk_dir = format!("-I{}/include", _spdk_dir);
-    let include_path_spdk_dir = "-I/home/zeyuanhu/spdk_install/include";
+    let include_path_spdk_dir = format!("-I{}/include", _spdk_install_dir);
 
     // The bindgen::Builder is the main entry point
     // to bindgen, and lets you build up options for
