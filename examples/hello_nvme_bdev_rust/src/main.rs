@@ -36,7 +36,7 @@ extern "C" fn hello_start(_arg1: *mut c_void, _arg2: *mut c_void) {
 
     unsafe {
         println!("Try to get a list of bdev ... ");
-        let mut first : *mut spdk_bdev = spdk_bdev_first();
+        let mut first: *mut spdk_bdev = spdk_bdev_first();
         while !first.is_null() {
             let owned_fmt = CString::new("bdev name: %s\n").unwrap();
             let fmt: *const c_char = owned_fmt.as_ptr();
@@ -46,10 +46,6 @@ extern "C" fn hello_start(_arg1: *mut c_void, _arg2: *mut c_void) {
     }
 
     unsafe {
-        let owned_fmt = CString::new("hello_context.bdev_name %s\n").unwrap();
-        let fmt: *const c_char = owned_fmt.as_ptr();
-        libc::printf(fmt, (*hello_context).bdev_name);
-
         (*hello_context).bdev = spdk_bdev_get_by_name((*hello_context).bdev_name);
         if (*hello_context).bdev.is_null() {
             println!("Could not find the bdev {}", CStr::from_ptr((*hello_context).bdev_name).to_str().unwrap());
@@ -57,18 +53,29 @@ extern "C" fn hello_start(_arg1: *mut c_void, _arg2: *mut c_void) {
             return;
         }
     }
-//
-//            println!("Opening io channel");
-//
-//            hello_context.bdev_io_channel = match spdk_bdev_get_io_channel(hello_context.bdev_desc) {
-//                Some(val) => val,
-//                None => {
-//                    println!("Could not create bdev I/O channel!!");
-//                    spdk_bdev_close(hello_context.bdev_desc);
-//                    spdk_app_stop(-1);
-//                    return;
-//                }
-//            };
+
+    unsafe {
+        println!("Opening the bdev {}", CStr::from_ptr((*hello_context).bdev_name).to_str().unwrap());
+//        let ptr : *mut *mut spdk_bdev_desc = ;
+        rc = spdk_bdev_open((*hello_context).bdev, true, None, ptr::null_mut(), &mut (*hello_context).bdev_desc);
+        if rc != 0 {
+            println!("Could not open bdev: {}", CStr::from_ptr((*hello_context).bdev_name).to_str().unwrap());
+            spdk_app_stop(-1);
+            return
+        }
+    }
+
+    unsafe {
+        println!("Opening io channel");
+        (*hello_context).bdev_io_channel = spdk_bdev_get_io_channel((*hello_context).bdev_desc);
+        if (*hello_context).bdev_io_channel.is_null() {
+            println!("Could not create bdev I/O channel!!");
+            spdk_bdev_close((*hello_context).bdev_desc);
+            spdk_app_stop(-1);
+            return;
+        }
+    }
+
 //
 //            blk_size = spdk_bdev_get_block_size(hello_context.bdev);
 //            buf_align = spdk_bdev_get_buf_align(hello_context.bdev);
