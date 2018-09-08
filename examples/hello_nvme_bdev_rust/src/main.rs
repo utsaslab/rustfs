@@ -1,3 +1,15 @@
+/*************************************************************************
+  > File Name:       main.rs
+  > Author:          Zeyuan Hu
+  > Mail:            iamzeyuanhu@utexas.edu
+  > Created Time:    09/07/18
+  > Description:
+
+    This program performs the same functionality as "hello_nvme_bdev.c".
+    It is used as a POC of using Rust bindings to invoke SPDK library
+    and perform basic I/O (i.e. write a string and then read it) on NVMe SSD.
+ ************************************************************************/
+
 #![allow(non_upper_case_globals)]
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
@@ -6,7 +18,6 @@ include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
 extern crate libc;
 
-//    use std::io::prelude::*;
 use std::ffi::{CString, CStr};
 use std::ptr;
 use std::os::raw::{c_void, c_char, c_int};
@@ -20,10 +31,6 @@ struct hello_context_t {
     bdev_name: *const c_char,
 }
 
-fn hello_bdev_usage() {
-    println!(" -b <bdev>                 name of the bdev to use");
-}
-
 extern "C" fn read_complete(bdev_io: *mut spdk_bdev_io,
                             success: bool,
                             cb_arg: *mut c_void) {
@@ -31,8 +38,14 @@ extern "C" fn read_complete(bdev_io: *mut spdk_bdev_io,
 
     unsafe {
         match success {
-            true => println!("Read string from bdev: {}", CStr::from_ptr((*hello_context).buff).to_str().unwrap()),
-            false => println!("bdev io read error")
+            true => {
+                let slice = CStr::from_ptr((*hello_context).buff);
+                println!("string buffer size without nul terminator: {}", slice.to_bytes().len());
+                println!("Read string from bdev: {}", CStr::from_ptr((*hello_context).buff).to_str().unwrap());
+            }
+            false => {
+                println!("bdev io read error");
+            }
         }
 
         spdk_bdev_free_io(bdev_io);
@@ -55,7 +68,9 @@ extern "C" fn write_complete(bdev_io: *mut spdk_bdev_io,
         spdk_bdev_free_io(bdev_io);
 
         match success {
-            true => println!("bdev io write completed successfully"),
+            true => {
+                println!("bdev io write completed successfully");
+            }
             false => {
                 println!("bdev io write error: {}", EIO);
                 spdk_put_io_channel((*hello_context).bdev_io_channel);
@@ -144,7 +159,9 @@ extern "C" fn hello_start(_arg1: *mut c_void, _arg2: *mut c_void) {
 
         let owned_fmt = CString::new("%s\n").unwrap();
         let fmt: *const c_char = owned_fmt.as_ptr();
-        libc::snprintf((*hello_context).buff, blk_size as usize, fmt, "Hello World!\n");
+        let owned_content = CString::new("Hello World!\n").unwrap();
+        let content: *const c_char = owned_content.as_ptr();
+        snprintf((*hello_context).buff, blk_size as usize, fmt, content);
 
         println!("Writing to the bdev");
         let hello_context_ptr: *mut c_void = hello_context as *mut _ as *mut c_void;
