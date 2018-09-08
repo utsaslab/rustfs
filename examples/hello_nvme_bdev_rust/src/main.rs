@@ -8,6 +8,18 @@
     This program performs the same functionality as "hello_nvme_bdev.c".
     It is used as a POC of using Rust bindings to invoke SPDK library
     and perform basic I/O (i.e. write a string and then read it) on NVMe SSD.
+
+    Caveats:
+
+    - This program doesn't support the input arguments like "hello_nvme_bdev.c"
+    If you want to work with customized path to bdev.conf, please modify the line:
+
+      let owned_config_file = CString::new("/home/zeyuanhu/rustfs/examples/hello_nvme_bdev/bdev.conf").unwrap();
+
+    - Similary, if you want to use different bdev name (i.e. value after -b in
+    "hello_nvme_bdev.c"), please modify the line:
+
+      let owned_bdev_name = CString::new("Nvme0n1").unwrap();
  ************************************************************************/
 
 #![allow(non_upper_case_globals)]
