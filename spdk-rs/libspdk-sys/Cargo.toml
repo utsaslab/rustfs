@@ -3,4 +3,5 @@ name = "libspdk-sys"
 version = "0.1.0"
 authors = ["xxks-kkk <ferrishu3886@gmail.com>"]
 
-[dependencies]
+[build-dependencies]
+bindgen = "0.35.0"
