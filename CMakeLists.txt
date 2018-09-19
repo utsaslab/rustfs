@@ -21,25 +21,12 @@ set(CMAKE_C_EXTENSIONS OFF)
 # Let CMake know where to search for the commonly-used CMake macros
 set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/CMakeModules)
 
-# SPDK_DIR should point to the install location of the SPDK library
-set(SPDK_DIR $ENV{SPDK_DIR})
-if (NOT SPDK_DIR)
-    message(SEND_ERROR "SPDK_DIR not found into the environment")
+# SPDK_INSTALL_DIR should point to the install location of the SPDK library
+set(SPDK_INSTALL_DIR $ENV{SPDK_INSTALL_DIR})
+if (NOT SPDK_INSTALL_DIR)
+    message(SEND_ERROR "SPDK_INSTALL_DIR not found into the environment")
 else ()
-    message(STATUS "SPDK_DIR = $ENV{SPDK_DIR}")
-endif ()
-
-# DPDK_DIR should point to the install location of the DPDK library
-# Note: please use the mirror of DPDK library shipped with SPDK library
-# (DPDK library is maintained as a submodule of SPDK library. Thus, the best way to access the DPDK library is by
-# following the submodule link from SPDK library git repo: https://github.com/spdk/spdk)
-# Build the SPDK library will automatically build the DPDK library submodule. Then, you can point
-# DPDK_DIR to the build directory (i.e. spdk/dpdk/build)
-set(DPDK_DIR $ENV{DPDK_DIR})
-if (NOT DPDK_DIR)
-    message(SEND_ERROR "DPDK_DIR not found into the environment")
-else ()
-    message(STATUS "DPDK_DIR = $ENV{DPDK_DIR}")
+    message(STATUS "SPDK_INSTALL_DIR = $ENV{SPDK_INSTALL_DIR}")
 endif ()
 
 # Setup the basic C Compiler flags
@@ -55,6 +42,6 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} \
     ")
 
 # include the SPDK API headers
-include_directories(${SPDK_DIR}/include)
+include_directories(${SPDK_INSTALL_DIR}/include)
 
 add_subdirectory(examples/hello_nvme_bdev)

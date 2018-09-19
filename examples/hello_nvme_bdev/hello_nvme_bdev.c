@@ -253,7 +253,7 @@ main(int argc, char **argv)
      * hzy: If none of the parameters are provide the application will use the
      * default parameters(-c bdev.conf -b Nvme0n1).
      */
-    if ((rc = spdk_app_parse_args(argc, argv, &opts, "b:", NULL, hello_bdev_parse_arg,
+    if ((rc = spdk_app_parse_args(argc, argv, &opts, "b:", hello_bdev_parse_arg,
                                   hello_bdev_usage)) != SPDK_APP_PARSE_ARGS_SUCCESS)
     {
         exit(rc);
