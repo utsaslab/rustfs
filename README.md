@@ -9,7 +9,8 @@ RustFS will be written in Rust, taking advantage of the high-level features offe
 ## Get Involvement
 Any contributions are welcome. To get started with the project, look at our
 [issues](https://github.com/utsaslab/rustfs/issues) tab and start to work
-on the issues that look most interesting to you. Issues with label "[Up for the grab](https://github.com/utsaslab/rustfs/issues?q=is%3Aissue+is%3Aopen+label%3A%22Up+for+the+grab%22)"
+on the issues that look most interesting to you. Issues with label "
+[Up for the grab](https://github.com/utsaslab/rustfs/issues?q=is%3Aissue+is%3Aopen+label%3A%22Up+for+the+grab%22)"
 are the ones we want help from you. To get the status of the project, please
 check out [Rustfs project page](https://github.com/utsaslab/rustfs/projects/1). 
 We also have [Wiki page](https://github.com/utsaslab/rustfs/wiki) to help you
