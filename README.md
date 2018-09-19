@@ -7,11 +7,9 @@ RustFS will be written in Rust, taking advantage of the high-level features offe
 2. [Vijay Chidambaram (vijay03)](https://github.com/vijay03)
 
 ## Get Involvement
-Any contributions are welcome. To get started with the project, look at our
+Any contributions are welcome. To get started with the project, check out  our
 [issues](https://github.com/utsaslab/rustfs/issues) tab and start to work
-on the issues that look most interesting to you. Issues with label "
-[Up for the grab](https://github.com/utsaslab/rustfs/issues?q=is%3Aissue+is%3Aopen+label%3A%22Up+for+the+grab%22)"
-are the ones we want help from you. We also categorize each issues with areas that you
+on the issues that look most interesting to you. We categorize each issues with areas that you
 may experience in a software development setting (e.g. "[DevOps](https://github.com/utsaslab/rustfs/issues?q=is%3Aissue+is%3Aopen+label%3ADevOps)",
 "[Software Engineering](https://github.com/utsaslab/rustfs/issues?q=is%3Aissue+is%3Aopen+label%3A%22Software+Engineering%22)",
 "[Research](https://github.com/utsaslab/rustfs/issues?q=is%3Aissue+is%3Aopen+label%3AResearch)" and so on).
