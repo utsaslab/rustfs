@@ -1,0 +1,7 @@
+[package]
+name = "hello_nvme_bdev_rust_wrapper2"
+version = "0.1.0"
+authors = ["xxks-kkk <ferrishu3886@gmail.com>"]
+
+[dependencies]
+spdk-rs = { path="../../spdk-rs"}

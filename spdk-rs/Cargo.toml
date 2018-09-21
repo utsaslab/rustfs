@@ -1,0 +1,7 @@
+[package]
+name = "spdk-rs"
+version = "0.1.0"
+authors = ["xxks-kkk <ferrishu3886@gmail.com>"]
+
+[dependencies]
+libspdk-sys = { path = "libspdk-sys" }
