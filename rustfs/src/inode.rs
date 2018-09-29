@@ -5,9 +5,12 @@
   > Created Time:    9/21/18
   > Description:
     
-    Fill in the purpose of this source file here.
+    This file contains the implementation of the inode.
  ************************************************************************/
 
+extern crate spdk_rs;
+
+use self::spdk_rs::raw;
 use time;
 use time::Timespec;
 use std::mem;
@@ -47,6 +50,8 @@ pub struct Inode {
 
 impl Inode {
     pub fn new() -> Inode {
+        // NOTE: here we show how to use spdk_rs
+        let opts : raw::spdk_app_opts;
         let time_now = time::get_time();
 
         Inode {
@@ -238,5 +243,12 @@ mod tests {
 
         let (create, _, _) = inode.stat();
         assert_eq!(create.sec, time_now.sec);
+    }
+
+    #[test]
+    fn test_dummy() {
+        // NOTE: below two lines how we can use the data structure from spdk_rs
+        use inode::spdk_rs::raw;
+        let opts : raw::spdk_app_opts;
     }
 }
