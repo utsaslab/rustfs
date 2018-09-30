@@ -7,3 +7,4 @@ authors = ["xxks-kkk <ferrishu3886@gmail.com>"]
 time = "0.1"
 rand = "0.3"
 spdk-rs = { path="../spdk-rs"}
+libc = "0.2"
