@@ -10,6 +10,10 @@
 
 use raw;
 
-fn main(){
-    let opts : raw::spdk_app_opts;
+
+
+
+#[cfg(test)]
+mod tests {
+
 }

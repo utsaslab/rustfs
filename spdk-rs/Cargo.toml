@@ -5,3 +5,5 @@ authors = ["xxks-kkk <ferrishu3886@gmail.com>"]
 
 [dependencies]
 libspdk-sys = { path = "libspdk-sys" }
+failure = "0.1.2"
+libc = "0.2.43"
