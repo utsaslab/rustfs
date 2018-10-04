@@ -5,8 +5,10 @@ extern crate failure;
 extern crate libc;
 
 mod event;
+mod bdev;
 
 pub use event::{AppOpts, AppContext, app_stop};
+pub use bdev::{Bdev};
 
 
 //fn main() {

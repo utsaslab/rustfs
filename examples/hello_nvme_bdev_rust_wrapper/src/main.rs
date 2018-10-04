@@ -12,7 +12,7 @@
 
 extern crate spdk_rs;
 
-use spdk_rs::{AppOpts, AppContext, app_stop};
+use spdk_rs::{AppOpts, AppContext, app_stop, Bdev};
 
 // https://stackoverflow.com/questions/33376486/is-there-a-way-other-than-traits-to-add-methods-to-a-type-i-dont-own
 trait AppContextExt {
@@ -22,6 +22,8 @@ trait AppContextExt {
 impl AppContextExt for AppContext {
     fn hello_start() {
         println!("Successfully started the application");
+        let bdev = Bdev::spdk_bdev_first();
+        println!("Bdev name: {}", bdev.name());
         app_stop(true);
     }
 }
