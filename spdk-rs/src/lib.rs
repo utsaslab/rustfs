@@ -6,9 +6,9 @@ extern crate libc;
 
 mod event;
 
-pub use event::{AppOpts};
+pub use event::{AppOpts, AppContext};
 
 
-fn main() {
-    let mut opts :raw::spdk_app_opts;
-}
+//fn main() {
+//    let mut opts :raw::spdk_app_opts;
+//}

@@ -12,17 +12,18 @@
 
 extern crate spdk_rs;
 
-use spdk_rs::AppOpts;
-use std::path::Path;
+use spdk_rs::{AppOpts, AppContext};
 
 fn main()
 {
     println!("Enter main");
-    let config_file = Path::new("/home/zeyuanhu/rustfs/examples/hello_nvme_bdev/bdev.conf").canonicalize().unwrap();
     let mut opts = AppOpts::new();
+    opts.name("hello_bdev");
+    opts.config_file("/home/zeyuanhu/rustfs/examples/hello_nvme_bdev/bdev.conf");
 
-//    opts.name("hello_blob");
-//    opts.config_file(config_file.to_str().unwrap());
+    let mut context =AppContext::new();
+    context.bdev_name("Nvme0n1");
+
 //
 //    let ret = opts.start(|| {
 //        let executor = executor::initialize();

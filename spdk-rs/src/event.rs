@@ -1,11 +1,11 @@
 /*************************************************************************
-  > File Name:       event.rs.rs
+  > File Name:       event.rs
   > Author:          Zeyuan Hu
   > Mail:            iamzeyuanhu@utexas.edu
   > Created Time:    10/2/18
   > Description:
     
-    FFI for "bdev.h"
+    FFI for "event.h"
  ************************************************************************/
 
 use raw;
@@ -13,6 +13,7 @@ use failure::Error;
 use std::os::raw::{c_char, c_void};
 use std::ffi::CString;
 use std::ptr;
+use std::mem;
 
 #[derive(Debug, Fail)]
 enum AppError {
@@ -20,6 +21,33 @@ enum AppError {
     StartupError(i32),
 }
 
+pub struct AppContext {
+    bdev: *mut raw::spdk_bdev,
+    bdev_desc: *mut raw::spdk_bdev_desc,
+    bdev_io_channel: *mut raw::spdk_io_channel,
+    buff: *mut c_char,
+    bdev_name: *const c_char,
+}
+
+impl AppContext {
+    pub fn new() -> Self {
+        let context: AppContext;
+        unsafe {
+            context = mem::uninitialized();
+        }
+        context
+    }
+
+    pub fn bdev_name(&mut self, name: &str) {
+        self.bdev_name = CString::new(name)
+            .expect("Couldn't create a string")
+            .into_raw()
+    }
+}
+
+
+// tuple struct: https://doc.rust-lang.org/1.9.0/book/structs.html
+// https://stackoverflow.com/questions/30339831/what-are-some-use-cases-for-tuple-structs
 #[derive(Default)]
 pub struct AppOpts(raw::spdk_app_opts);
 
