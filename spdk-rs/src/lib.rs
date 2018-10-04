@@ -6,7 +6,7 @@ extern crate libc;
 
 mod event;
 
-pub use event::{AppOpts, AppContext};
+pub use event::{AppOpts, AppContext, app_stop};
 
 
 //fn main() {

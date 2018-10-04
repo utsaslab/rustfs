@@ -12,7 +12,19 @@
 
 extern crate spdk_rs;
 
-use spdk_rs::{AppOpts, AppContext};
+use spdk_rs::{AppOpts, AppContext, app_stop};
+
+// https://stackoverflow.com/questions/33376486/is-there-a-way-other-than-traits-to-add-methods-to-a-type-i-dont-own
+trait AppContextExt {
+    fn hello_start();
+}
+
+impl AppContextExt for AppContext {
+    fn hello_start() {
+        println!("Successfully started the application");
+        app_stop(true);
+    }
+}
 
 fn main()
 {
@@ -21,19 +33,10 @@ fn main()
     opts.name("hello_bdev");
     opts.config_file("/home/zeyuanhu/rustfs/examples/hello_nvme_bdev/bdev.conf");
 
-    let mut context =AppContext::new();
+    let mut context = AppContext::new();
     context.bdev_name("Nvme0n1");
 
-//
-//    let ret = opts.start(|| {
-//        let executor = executor::initialize();
-//
-//        // TODO: fixup
-//        mem::forget(executor);
-//
-//        // Register the executor poller
-//        let poller = io_channel::poller_register(executor::pure_poll);
-//
-//        executor::spawn(run(poller));
-//    });
+    let ret = opts.start(|| {
+        spdk_rs::AppContext::hello_start();
+    }, context);
 }
