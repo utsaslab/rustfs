@@ -17,17 +17,6 @@ pub struct Bdev {
     raw: *mut raw::spdk_bdev,
 }
 
-//pub struct BdevIter<'bdev_iter> {
-//    bdev: &'bdev_iter Bdev,
-//}
-//
-//impl<'bdev_iter> Iterator for BdevIter<'bdev_iter> {
-//    type Item = Bdev;
-//    fn next(&mut self) -> Option<Bdev> {
-//        self.bdev.spdk_bdev_next()
-//    }
-//}
-
 impl Bdev {
     unsafe fn from_raw(raw: *mut raw::spdk_bdev) -> Bdev {
         Bdev {
@@ -46,17 +35,6 @@ impl Bdev {
         }
     }
 
-//    pub fn spdk_bdev_next(&self) -> Option<Bdev> {
-//        unsafe {
-//            let ptr = raw::spdk_bdev_next(self.raw);
-//            if ptr.is_null() {
-//                None
-//            } else {
-//                Some(Bdev::from_raw(ptr))
-//            }
-//        }
-//    }
-
     pub fn spdk_bdev_next(prev: &Bdev) -> Option<Bdev> {
         unsafe {
             let ptr = raw::spdk_bdev_next(prev.raw);
@@ -68,17 +46,6 @@ impl Bdev {
         }
     }
 
-//    pub fn spdk_bdev_next(&self) -> Option<Bdev> {
-//        unsafe {
-//            let ptr = raw::spdk_bdev_next(self.raw);
-//            if ptr.is_null() {
-//                None
-//            } else {
-//                Some(Bdev::from_raw(ptr))
-//            }
-//        }
-//    }
-
     pub fn name(&self) -> &str {
         let str_slice: &str;
         unsafe {
@@ -88,10 +55,4 @@ impl Bdev {
         }
         str_slice
     }
-
-//    pub fn iter(&self) -> BdevIter {
-//        BdevIter {
-//            bdev: self
-//        }
-//    }
 }
