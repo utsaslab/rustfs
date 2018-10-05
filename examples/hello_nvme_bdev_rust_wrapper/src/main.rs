@@ -22,8 +22,12 @@ trait AppContextExt {
 impl AppContextExt for AppContext {
     fn hello_start() {
         println!("Successfully started the application");
-        let bdev = Bdev::spdk_bdev_first();
-        println!("Bdev name: {}", bdev.name());
+        let mut first_bdev = Bdev::spdk_bdev_first();
+        while  !first_bdev.is_none() {
+            let mut dev = first_bdev.unwrap();
+            println!("bdev name: {}", bdev.name());
+            first_bdev = Bdev::spdk_bdev_next(bdev);
+        }
         app_stop(true);
     }
 }
