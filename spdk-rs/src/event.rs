@@ -45,6 +45,15 @@ impl AppContext {
             .expect("Couldn't create a string")
             .into_raw()
     }
+
+    pub fn get_bdev_name(&self) -> &str {
+        unsafe {
+            let c_buf: *const c_char = self.bdev_name;
+            let c_str: &CStr = CStr::from_ptr(c_buf);
+            let str_slice: &str = c_str.to_str().unwrap();
+            str_slice
+        }
+    }
 }
 
 
@@ -74,7 +83,7 @@ impl AppOpts {
             .into_raw()
     }
 
-    pub fn start<F>(mut self, f: F, context: AppContext) -> Result<(), Error>
+    pub fn start<F>(mut self, f: F, context: &AppContext) -> Result<(), Error>
         where
             F: Fn() -> (),
     {

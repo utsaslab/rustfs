@@ -16,11 +16,11 @@ use spdk_rs::{AppOpts, AppContext, app_stop, Bdev};
 
 // https://stackoverflow.com/questions/33376486/is-there-a-way-other-than-traits-to-add-methods-to-a-type-i-dont-own
 trait AppContextExt {
-    fn hello_start();
+    fn hello_start(context : &AppContext);
 }
 
 impl AppContextExt for AppContext {
-    fn hello_start() {
+    fn hello_start(context : &AppContext) {
         println!("Successfully started the application");
         let mut first_bdev = Bdev::spdk_bdev_first();
         while  !first_bdev.is_none() {
@@ -28,7 +28,8 @@ impl AppContextExt for AppContext {
             println!("bdev name: {}", bdev.name());
             first_bdev = Bdev::spdk_bdev_next(&bdev);
         }
-        let bdev = Bdev::spdk_bdev_get_by_name("Nvme0n1");
+        let bdev_name = context.get_bdev_name();
+        let bdev = Bdev::spdk_bdev_get_by_name(bdev_name);
         match bdev {
             Err(E) => {
                 let s = E.to_owned();
@@ -53,6 +54,6 @@ fn main()
     context.bdev_name("Nvme0n1");
 
     let ret = opts.start(|| {
-        spdk_rs::AppContext::hello_start();
-    }, context);
+        spdk_rs::AppContext::hello_start(&context);
+    }, &context);
 }
