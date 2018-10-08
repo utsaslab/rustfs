@@ -24,9 +24,19 @@ impl AppContextExt for AppContext {
         println!("Successfully started the application");
         let mut first_bdev = Bdev::spdk_bdev_first();
         while  !first_bdev.is_none() {
-            let mut dev = first_bdev.unwrap();
+            let mut bdev = first_bdev.unwrap();
             println!("bdev name: {}", bdev.name());
-            first_bdev = Bdev::spdk_bdev_next(bdev);
+            first_bdev = Bdev::spdk_bdev_next(&bdev);
+        }
+        let bdev = Bdev::spdk_bdev_get_by_name("Nvme0n1");
+        match bdev {
+            Err(E) => {
+                let s = E.to_owned();
+                let s_slice = &s[..];
+                println!("{}", E);
+                app_stop(false);
+            }
+            Ok(T) => {}
         }
         app_stop(true);
     }

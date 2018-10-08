@@ -10,8 +10,7 @@
 
 use raw;
 use std::ptr;
-use std::ffi::CStr;
-use std::marker;
+use std::ffi::{CString, CStr};
 
 pub struct Bdev {
     raw: *mut raw::spdk_bdev,
@@ -42,6 +41,20 @@ impl Bdev {
                 None
             } else {
                 Some(Bdev::from_raw(ptr))
+            }
+        }
+    }
+
+    pub fn spdk_bdev_get_by_name(bdev_name: &str) -> Result<Bdev, String> {
+        unsafe {
+            let c_str = CString::new(bdev_name).unwrap();
+            let c_str_ptr = c_str.as_ptr();
+            let ptr = raw::spdk_bdev_get_by_name(c_str_ptr);
+            if ptr.is_null() {
+                Result::Err(format!("Could not find the bdev: {}", bdev_name))
+            }
+            else {
+                Ok(Bdev::from_raw(ptr))
             }
         }
     }

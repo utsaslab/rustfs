@@ -11,7 +11,7 @@
 use raw;
 use failure::Error;
 use std::os::raw::{c_char, c_void};
-use std::ffi::CString;
+use std::ffi::{CStr,CString};
 use std::ptr;
 use std::mem;
 
