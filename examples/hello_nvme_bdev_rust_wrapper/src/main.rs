@@ -38,6 +38,14 @@ fn hello_start(context: &mut AppContext) {
         }
         Ok(_) => ()
     }
+    match context.spdk_bdev_get_io_channel() {
+        Err(_e) => {
+            println!("{}", _e.to_owned());
+            context.spdk_bdev_close();
+            app_stop(false);
+        }
+        Ok(_) => ()
+    }
     context.spdk_bdev_close();
     app_stop(true);
 }

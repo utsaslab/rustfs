@@ -113,6 +113,22 @@ impl AppContext {
             raw::spdk_bdev_close(self.bdev_desc);
         }
     }
+
+    pub fn spdk_bdev_get_io_channel(&mut self) -> Result<i32, String> {
+        unsafe {
+            let ptr = raw::spdk_bdev_get_io_channel(self.bdev_desc);
+            match ptr.is_null() {
+                true => {
+                    let s = format!("Could not create bdev I/O channel!!");
+                    Err(s)
+                }
+                false => {
+                    self.bdev_io_channel = ptr;
+                    Ok(0)
+                }
+            }
+        }
+    }
 }
 
 
