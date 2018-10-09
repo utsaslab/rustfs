@@ -10,6 +10,7 @@
 use {raw, AppContext};
 use std::ffi::{CString, CStr};
 use std::marker;
+use std::ptr;
 
 pub struct Bdev<'app_context> {
     raw: *mut raw::spdk_bdev,
@@ -17,10 +18,12 @@ pub struct Bdev<'app_context> {
 }
 
 impl<'app_context> Bdev<'app_context> {
-    unsafe fn from_raw(raw: *mut raw::spdk_bdev) -> Bdev<'app_context> {
-        Bdev {
-            raw: raw,
-            _marker: marker::PhantomData
+    pub fn from_raw(raw: *mut raw::spdk_bdev) -> Bdev<'app_context> {
+        unsafe {
+            Bdev {
+                raw: raw,
+                _marker: marker::PhantomData
+            }
         }
     }
 
@@ -60,17 +63,6 @@ impl<'app_context> Bdev<'app_context> {
         }
     }
 
-    /// # Parameters
-    ///
-    /// - context: the context when start the SPDK framework
-    /// - write: true is read/write access requested, false if read-only
-    ///
-//    pub fn spdk_bdev_open(context : &AppContext, write : bool) -> Result<int, String> {
-//        unsafe {
-//            let rc = raw::spdk_bdev_open(context.bdev, )
-//        }
-//    }
-
     pub fn name(&self) -> &str {
         let str_slice: &str;
         unsafe {
@@ -82,6 +74,26 @@ impl<'app_context> Bdev<'app_context> {
     }
 
     pub fn to_raw(&self) -> *mut raw::spdk_bdev {
+        self.raw
+    }
+}
+
+pub struct BdevDesc<'app_context> {
+    raw: *mut raw::spdk_bdev_desc,
+    _marker: marker::PhantomData<&'app_context AppContext>,
+}
+
+impl<'app_context> BdevDesc<'app_context> {
+    pub fn from_raw(raw: *mut raw::spdk_bdev_desc) -> BdevDesc<'app_context> {
+        unsafe {
+            BdevDesc {
+                raw: raw,
+                _marker: marker::PhantomData
+            }
+        }
+    }
+
+    pub fn to_raw(&self) -> *mut raw::spdk_bdev_desc {
         self.raw
     }
 }

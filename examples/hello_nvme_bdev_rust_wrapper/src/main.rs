@@ -25,10 +25,20 @@ fn hello_start(context: &mut AppContext) {
         first_bdev = Bdev::spdk_bdev_next(&bdev);
     }
     match context.set_bdev(){
-        Err(E) => app_stop(false),
-        _ => ()
+        Err(_e) => {
+            println!("{}", _e.to_owned());
+            app_stop(false);
+        },
+        Ok(_) => ()
     };
-
+    match context.spdk_bdev_open(true) {
+        Err(_e) => {
+            println!("{}", _e.to_owned());
+            app_stop(false);
+        }
+        Ok(_) => ()
+    }
+    context.spdk_bdev_close();
     app_stop(true);
 }
 

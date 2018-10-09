@@ -8,7 +8,7 @@
     FFI for "event.h"
  ************************************************************************/
 
-use {raw, Bdev};
+use {raw, Bdev, BdevDesc};
 use failure::Error;
 use std::os::raw::{c_char, c_void};
 use std::ffi::{CStr, CString};
@@ -54,6 +54,10 @@ impl AppContext {
         }
     }
 
+    pub fn bdev(&self) -> Option<Bdev> {
+        Some(Bdev::from_raw(self.bdev))
+    }
+
     /// set bdev field based on the bdev_name
     ///
     /// **NOTE:** The implementation can be improved becaseu we essentially
@@ -74,9 +78,39 @@ impl AppContext {
                 Err(s)
             }
             Ok(T) => {
-                    self.bdev = T.to_raw();
-                    Ok(0)
+                self.bdev = T.to_raw();
+                Ok(0)
             }
+        }
+    }
+
+    pub fn bdev_desc(&self) -> Option<BdevDesc> {
+        Some(BdevDesc::from_raw(self.bdev_desc))
+    }
+
+    /// # Parameters
+    ///
+    /// - context: the context when start the SPDK framework
+    /// - write: true is read/write access requested, false if read-only
+    ///
+    pub fn spdk_bdev_open(&mut self, write: bool) -> Result<i32, String> {
+        unsafe {
+            let rc = raw::spdk_bdev_open(self.bdev, write, None, ptr::null_mut(), &mut self.bdev_desc);
+            match rc != 0 {
+                true => {
+                    let s = format!("Could not open bdev: {}", self.bdev_name());
+                    Err(s)
+                }
+                false => {
+                    Ok(0)
+                }
+            }
+        }
+    }
+
+    pub fn spdk_bdev_close(&mut self) {
+        unsafe {
+            raw::spdk_bdev_close(self.bdev_desc);
         }
     }
 }
