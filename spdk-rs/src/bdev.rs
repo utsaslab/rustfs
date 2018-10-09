@@ -7,23 +7,24 @@
     
     FFI for "bdev.h"
  ************************************************************************/
-
-use raw;
-use std::ptr;
+use {raw, AppContext};
 use std::ffi::{CString, CStr};
+use std::marker;
 
-pub struct Bdev {
+pub struct Bdev<'app_context> {
     raw: *mut raw::spdk_bdev,
+    _marker: marker::PhantomData<&'app_context AppContext>,
 }
 
-impl Bdev {
-    unsafe fn from_raw(raw: *mut raw::spdk_bdev) -> Bdev {
+impl<'app_context> Bdev<'app_context> {
+    unsafe fn from_raw(raw: *mut raw::spdk_bdev) -> Bdev<'app_context> {
         Bdev {
             raw: raw,
+            _marker: marker::PhantomData
         }
     }
 
-    pub fn spdk_bdev_first() -> Option<Bdev> {
+    pub fn spdk_bdev_first() -> Option<Bdev<'app_context>> {
         unsafe {
             let ptr = raw::spdk_bdev_first();
             if ptr.is_null() {
@@ -34,7 +35,7 @@ impl Bdev {
         }
     }
 
-    pub fn spdk_bdev_next(prev: &Bdev) -> Option<Bdev> {
+    pub fn spdk_bdev_next(prev: &Bdev) -> Option<Bdev<'app_context>> {
         unsafe {
             let ptr = raw::spdk_bdev_next(prev.raw);
             if ptr.is_null() {
@@ -59,6 +60,17 @@ impl Bdev {
         }
     }
 
+    /// # Parameters
+    ///
+    /// - context: the context when start the SPDK framework
+    /// - write: true is read/write access requested, false if read-only
+    ///
+//    pub fn spdk_bdev_open(context : &AppContext, write : bool) -> Result<int, String> {
+//        unsafe {
+//            let rc = raw::spdk_bdev_open(context.bdev, )
+//        }
+//    }
+
     pub fn name(&self) -> &str {
         let str_slice: &str;
         unsafe {
@@ -67,5 +79,9 @@ impl Bdev {
             str_slice = c_str.to_str().unwrap();
         }
         str_slice
+    }
+
+    pub fn to_raw(&self) -> *mut raw::spdk_bdev {
+        self.raw
     }
 }

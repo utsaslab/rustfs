@@ -9,30 +9,26 @@
     It uses the spdk-rs rust-friendly FFI.
 
  ************************************************************************/
+#![feature(nll)]
 
 extern crate spdk_rs;
 
 use spdk_rs::{AppOpts, AppContext, app_stop, Bdev};
 
-fn hello_start(context: &AppContext) {
+
+fn hello_start(context: &mut AppContext) {
     println!("Successfully started the application");
     let mut first_bdev = Bdev::spdk_bdev_first();
     while !first_bdev.is_none() {
-        let mut bdev = first_bdev.unwrap();
+        let bdev = first_bdev.unwrap();
         println!("bdev name: {}", bdev.name());
         first_bdev = Bdev::spdk_bdev_next(&bdev);
     }
-    let bdev_name = context.get_bdev_name();
-    let bdev = Bdev::spdk_bdev_get_by_name(bdev_name);
-    match bdev {
-        Err(E) => {
-            let s = E.to_owned();
-            let s_slice = &s[..];
-            println!("{}", E);
-            app_stop(false);
-        }
-        Ok(T) => {}
-    }
+    match context.set_bdev(){
+        Err(E) => app_stop(false),
+        _ => ()
+    };
+
     app_stop(true);
 }
 
@@ -44,9 +40,9 @@ fn main()
     opts.config_file("/home/zeyuanhu/rustfs/examples/hello_nvme_bdev/bdev.conf");
 
     let mut context = AppContext::new();
-    context.bdev_name("Nvme0n1");
+    context.set_bdev_name("Nvme0n1");
 
     let ret = opts.start(|| {
-        hello_start(&context);
-    }, &context);
+        hello_start(&mut context);
+    });
 }

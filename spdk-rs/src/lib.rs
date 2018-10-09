@@ -1,4 +1,5 @@
-//pub extern crate libspdk_sys as raw;
+#![feature(nll)]
+
 extern crate libspdk_sys as raw;
 #[macro_use]
 extern crate failure;
@@ -9,8 +10,3 @@ mod bdev;
 
 pub use event::{AppOpts, AppContext, app_stop};
 pub use bdev::{Bdev};
-
-
-//fn main() {
-//    let mut opts :raw::spdk_app_opts;
-//}

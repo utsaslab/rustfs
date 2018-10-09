@@ -8,12 +8,11 @@
     FFI for "event.h"
  ************************************************************************/
 
-use raw;
+use {raw, Bdev};
 use failure::Error;
 use std::os::raw::{c_char, c_void};
-use std::ffi::{CStr,CString};
+use std::ffi::{CStr, CString};
 use std::ptr;
-use std::mem;
 
 #[derive(Debug, Fail)]
 enum AppError {
@@ -40,18 +39,44 @@ impl AppContext {
         }
     }
 
-    pub fn bdev_name(&mut self, name: &str) {
+    pub fn set_bdev_name(&mut self, name: &str) {
         self.bdev_name = CString::new(name)
             .expect("Couldn't create a string")
             .into_raw()
     }
 
-    pub fn get_bdev_name(&self) -> &str {
+    pub fn bdev_name(&self) -> &str {
         unsafe {
             let c_buf: *const c_char = self.bdev_name;
             let c_str: &CStr = CStr::from_ptr(c_buf);
             let str_slice: &str = c_str.to_str().unwrap();
             str_slice
+        }
+    }
+
+    /// set bdev field based on the bdev_name
+    ///
+    /// **NOTE:** The implementation can be improved becaseu we essentially
+    /// duplicate code of bdev_name. The reason we doing so as a way to workaround
+    /// the borrow checker. See more info about the issue I'm facing during the implementation
+    /// [here](https://stackoverflow.com/questions/52709147/how-to-workaround-the-coexistence-of-a-mutable-and-immutable-borrow)
+    pub fn set_bdev(&mut self) -> Result<i32, String> {
+        let str_slice;
+        unsafe {
+            let c_buf: *const c_char = self.bdev_name;
+            let c_str: &CStr = CStr::from_ptr(c_buf);
+            str_slice = c_str.to_str().unwrap();
+        }
+        let bdev = Bdev::spdk_bdev_get_by_name(str_slice);
+        match bdev {
+            Err(E) => {
+                let s = E.to_owned();
+                Err(s)
+            }
+            Ok(T) => {
+                    self.bdev = T.to_raw();
+                    Ok(0)
+            }
         }
     }
 }
@@ -83,15 +108,15 @@ impl AppOpts {
             .into_raw()
     }
 
-    pub fn start<F>(mut self, f: F, context: &AppContext) -> Result<(), Error>
+    pub fn start<F>(mut self, f: F) -> Result<(), Error>
         where
-            F: Fn() -> (),
+            F: FnMut() -> (),
     {
         let user_data = &f as *const _ as *mut c_void;
 
         extern "C" fn start_wrapper<F>(closure: *mut c_void, _: *mut c_void)
             where
-                F: Fn() -> (),
+                F: FnMut() -> (),
         {
             let opt_closure = closure as *mut F;
             unsafe { (*opt_closure)() }
@@ -109,9 +134,9 @@ impl AppOpts {
         };
 
         unsafe {
-            if (context.buff != ptr::null_mut()) {
-                raw::spdk_dma_free(context.buff as *mut c_void);
-            }
+//            if (context.buff != ptr::null_mut()) {
+//                raw::spdk_dma_free(context.buff as *mut c_void);
+//            }
             raw::spdk_app_fini();
         }
 
