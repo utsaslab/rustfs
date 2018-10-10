@@ -6,6 +6,11 @@
   > Description:
     
     FFI for "bdev.h"
+
+    Note that not all functions belong to "bdev.h" are implemented here.
+    For example, spdk_bdev_open() is implemented in the context instead
+    because spdk_bdev_open works with struct spdk_bdev* and
+    struct spdk_bdev_desc**, which usually used with the context struct.
  ************************************************************************/
 use {raw, AppContext};
 use std::ffi::{CString, CStr};
@@ -45,6 +50,21 @@ impl<'app_context> Bdev<'app_context> {
                 None
             } else {
                 Some(Bdev::from_raw(ptr))
+            }
+        }
+    }
+
+    pub fn spdk_bdev_open(bdev : &Bdev, write: bool, bdev_desc: &mut BdevDesc) -> Result<i32, String> {
+        unsafe {
+            let rc = raw::spdk_bdev_open(bdev.to_raw(), write, None, ptr::null_mut(), bdev_desc.mut_to_raw());
+            match rc != 0 {
+                true => {
+                    let s = format!("Could not open bdev: {}", bdev.name());
+                    Err(s)
+                }
+                false => {
+                    Ok(0)
+                }
             }
         }
     }
@@ -95,5 +115,9 @@ impl<'app_context> BdevDesc<'app_context> {
 
     pub fn to_raw(&self) -> *mut raw::spdk_bdev_desc {
         self.raw
+    }
+
+    pub fn mut_to_raw(&mut self) -> *mut *mut raw::spdk_bdev_desc {
+        &mut self.raw
     }
 }

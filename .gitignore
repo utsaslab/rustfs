@@ -12,3 +12,5 @@ Cargo.lock
 cmake-build-debug/
 .idea
 *~
+gdb.txt
+core
