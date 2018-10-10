@@ -6,6 +6,11 @@
   > Description:
     
     FFI for "bdev.h"
+
+    Note that not all functions belong to "bdev.h" are implemented here.
+    For example, spdk_bdev_open() is implemented in the context instead
+    because spdk_bdev_open works with struct spdk_bdev* and
+    struct spdk_bdev_desc**, which usually used with the context struct.
  ************************************************************************/
 use {raw, AppContext};
 use std::ffi::{CString, CStr};

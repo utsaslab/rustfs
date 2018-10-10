@@ -13,8 +13,7 @@
 
 extern crate spdk_rs;
 
-use spdk_rs::{AppOpts, AppContext, app_stop, Bdev};
-
+use spdk_rs::{spdk_app_stop, AppContext, SpdkAppOpts, Bdev};
 
 fn hello_start(context: &mut AppContext) {
     println!("Successfully started the application");
@@ -27,14 +26,14 @@ fn hello_start(context: &mut AppContext) {
     match context.set_bdev(){
         Err(_e) => {
             println!("{}", _e.to_owned());
-            app_stop(false);
+            spdk_app_stop(false);
         },
         Ok(_) => ()
     };
     match context.spdk_bdev_open(true) {
         Err(_e) => {
             println!("{}", _e.to_owned());
-            app_stop(false);
+            spdk_app_stop(false);
         }
         Ok(_) => ()
     }
@@ -42,18 +41,27 @@ fn hello_start(context: &mut AppContext) {
         Err(_e) => {
             println!("{}", _e.to_owned());
             context.spdk_bdev_close();
-            app_stop(false);
+            spdk_app_stop(false);
+        }
+        Ok(_) => ()
+    }
+    match context.allocate_buff() {
+        Err(_e) => {
+            println!("{}", _e.to_owned());
+            context.spdk_bdev_put_io_channel();
+            context.spdk_bdev_close();
+            spdk_app_stop(false);
         }
         Ok(_) => ()
     }
     context.spdk_bdev_close();
-    app_stop(true);
+    spdk_app_stop(true);
 }
 
 fn main()
 {
     println!("Enter main");
-    let mut opts = AppOpts::new();
+    let mut opts = SpdkAppOpts::new();
     opts.name("hello_bdev");
     opts.config_file("/home/zeyuanhu/rustfs/examples/hello_nvme_bdev/bdev.conf");
 
