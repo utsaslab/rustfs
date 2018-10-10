@@ -54,6 +54,21 @@ impl<'app_context> Bdev<'app_context> {
         }
     }
 
+    pub fn spdk_bdev_open(bdev : &Bdev, write: bool, bdev_desc: &mut BdevDesc) -> Result<i32, String> {
+        unsafe {
+            let rc = raw::spdk_bdev_open(bdev.to_raw(), write, None, ptr::null_mut(), bdev_desc.mut_to_raw());
+            match rc != 0 {
+                true => {
+                    let s = format!("Could not open bdev: {}", bdev.name());
+                    Err(s)
+                }
+                false => {
+                    Ok(0)
+                }
+            }
+        }
+    }
+
     pub fn spdk_bdev_get_by_name(bdev_name: &str) -> Result<Bdev, String> {
         unsafe {
             let c_str = CString::new(bdev_name).unwrap();
@@ -100,5 +115,9 @@ impl<'app_context> BdevDesc<'app_context> {
 
     pub fn to_raw(&self) -> *mut raw::spdk_bdev_desc {
         self.raw
+    }
+
+    pub fn mut_to_raw(&mut self) -> *mut *mut raw::spdk_bdev_desc {
+        &mut self.raw
     }
 }

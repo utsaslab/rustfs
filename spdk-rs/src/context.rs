@@ -90,20 +90,46 @@ impl AppContext {
 
     /// # Parameters
     ///
-    /// - context: the context when start the SPDK framework
+    /// - self: the context when start the SPDK framework
     /// - write: true is read/write access requested, false if read-only
     ///
+    /// Note: Below shows an native implementation of the spdk_bdev_open(), which might have less overhead.
+    /// Right now, we invoke the spdk_bdev_open() under bdev.rs to reach the desired goal. We have a one more
+    /// layer indirection. Doing so makes sense to the SPDK API: we want to have spdk_bdev_open() method
+    /// under bdev.rs instead of the context.rs. However, the overhead comes from we have to pack the self.bdev_desc
+    /// first to be modified and send to the bdev.rs spdk_bdev_open() and unpack the object to update the field
+    /// within the context struct.
+    ///
+    /// We only modify the spdk_bdev_open() to follow this philosophy of idea. Other original SPDK functions
+    /// that implemented under context.rs instead of bdev.rs may apply as well. We don't change them all of them for now
+    /// because there are trade-off between two ways of implementation and we may adopt one whenever we need.
+    ///
+    /// ```rust
+    ///   pub fn spdk_bdev_open(&mut self, write: bool) -> Result<i32, String> {
+    ///        unsafe {
+    ///            let rc = raw::spdk_bdev_open(self.bdev, write, None, ptr::null_mut(), &mut self.bdev_desc);
+    ///            match rc != 0 {
+    ///                true => {
+    ///                    let s = format!("Could not open bdev: {}", self.bdev_name());
+    ///                    Err(s)
+    ///                }
+    ///                false => {
+    ///                    Ok(0)
+    ///                }
+    ///            }
+    ///        }
+    ///    }
+    /// ```
     pub fn spdk_bdev_open(&mut self, write: bool) -> Result<i32, String> {
-        unsafe {
-            let rc = raw::spdk_bdev_open(self.bdev, write, None, ptr::null_mut(), &mut self.bdev_desc);
-            match rc != 0 {
-                true => {
-                    let s = format!("Could not open bdev: {}", self.bdev_name());
-                    Err(s)
-                }
-                false => {
-                    Ok(0)
-                }
+        let mut bdev_desc = BdevDesc::from_raw(self.bdev_desc);
+        match Bdev::spdk_bdev_open(&Bdev::from_raw(self.bdev), write, &mut bdev_desc) {
+            Err(_e) => {
+                let s = format!("Could not open bdev: {}", self.bdev_name());
+                Err(s)
+            }
+            Ok(_) => {
+                self.bdev_desc = bdev_desc.to_raw();
+                Ok(0)
             }
         }
     }
@@ -139,8 +165,8 @@ impl AppContext {
     pub fn allocate_buff(&mut self) -> Result<i32, String> {
         unsafe {
             self.buff = raw::spdk_dma_zmalloc(raw::spdk_bdev_get_block_size(self.bdev) as usize,
-                                         raw::spdk_bdev_get_buf_align(self.bdev),
-                                         ptr::null_mut()) as *mut c_char;
+                                              raw::spdk_bdev_get_buf_align(self.bdev),
+                                              ptr::null_mut()) as *mut c_char;
             match self.buff.is_null() {
                 true => {
                     let s = format!("Failed to allocate buffer");
