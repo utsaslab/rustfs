@@ -178,4 +178,16 @@ impl AppContext {
             }
         }
     }
+
+    /// hello_nvme_bdev specific function:
+    /// write message string into the the allocated buff
+    pub fn write_buff(&mut self, message : &str) {
+        let owned_fmt = CString::new("%s\n").unwrap();
+        let fmt: *const c_char = owned_fmt.as_ptr();
+        let owned_content = CString::new(message).unwrap();
+        let content: *const c_char = owned_content.as_ptr();
+        unsafe {
+            raw::snprintf(self.buff, raw::spdk_bdev_get_block_size(self.bdev) as usize, fmt, content);
+        }
+    }
 }

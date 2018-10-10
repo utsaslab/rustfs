@@ -54,6 +54,9 @@ fn hello_start(context: &mut AppContext) {
         }
         Ok(_) => ()
     }
+    context.write_buff("Hello World!");
+    println!("Writing to the bdev");
+
     context.spdk_bdev_close();
     spdk_app_stop(true);
 }
