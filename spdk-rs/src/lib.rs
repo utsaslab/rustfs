@@ -10,5 +10,5 @@ mod bdev;
 mod context;
 
 pub use event::{SpdkAppOpts, spdk_app_stop};
-pub use bdev::{Bdev, BdevDesc};
+pub use bdev::{SpdkBdev, SpdkBdevDesc};
 pub use context::{AppContext};

@@ -17,44 +17,42 @@ use std::ffi::{CString, CStr};
 use std::marker;
 use std::ptr;
 
-pub struct Bdev<'app_context> {
+pub struct SpdkBdev {
     raw: *mut raw::spdk_bdev,
-    _marker: marker::PhantomData<&'app_context AppContext>,
 }
 
-impl<'app_context> Bdev<'app_context> {
-    pub fn from_raw(raw: *mut raw::spdk_bdev) -> Bdev<'app_context> {
+impl SpdkBdev {
+    pub fn from_raw(raw: *mut raw::spdk_bdev) -> SpdkBdev {
         unsafe {
-            Bdev {
+            SpdkBdev {
                 raw: raw,
-                _marker: marker::PhantomData
             }
         }
     }
 
-    pub fn spdk_bdev_first() -> Option<Bdev<'app_context>> {
+    pub fn spdk_bdev_first() -> Option<SpdkBdev> {
         unsafe {
             let ptr = raw::spdk_bdev_first();
             if ptr.is_null() {
                 None
             } else {
-                Some(Bdev::from_raw(ptr))
+                Some(SpdkBdev::from_raw(ptr))
             }
         }
     }
 
-    pub fn spdk_bdev_next(prev: &Bdev) -> Option<Bdev<'app_context>> {
+    pub fn spdk_bdev_next(prev: &SpdkBdev) -> Option<SpdkBdev> {
         unsafe {
             let ptr = raw::spdk_bdev_next(prev.raw);
             if ptr.is_null() {
                 None
             } else {
-                Some(Bdev::from_raw(ptr))
+                Some(SpdkBdev::from_raw(ptr))
             }
         }
     }
 
-    pub fn spdk_bdev_open(bdev : &Bdev, write: bool, bdev_desc: &mut BdevDesc) -> Result<i32, String> {
+    pub fn spdk_bdev_open(bdev : &SpdkBdev, write: bool, bdev_desc: &mut SpdkBdevDesc) -> Result<i32, String> {
         unsafe {
             let rc = raw::spdk_bdev_open(bdev.to_raw(), write, None, ptr::null_mut(), bdev_desc.mut_to_raw());
             match rc != 0 {
@@ -69,7 +67,7 @@ impl<'app_context> Bdev<'app_context> {
         }
     }
 
-    pub fn spdk_bdev_get_by_name(bdev_name: &str) -> Result<Bdev, String> {
+    pub fn spdk_bdev_get_by_name(bdev_name: &str) -> Result<SpdkBdev, String> {
         unsafe {
             let c_str = CString::new(bdev_name).unwrap();
             let c_str_ptr = c_str.as_ptr();
@@ -78,10 +76,14 @@ impl<'app_context> Bdev<'app_context> {
                 Result::Err(format!("Could not find the bdev: {}", bdev_name))
             }
             else {
-                Ok(Bdev::from_raw(ptr))
+                Ok(SpdkBdev::from_raw(ptr))
             }
         }
     }
+
+//    pub fn spdk_bdev_write(desc : SpdkBdevDesc, ch : ) -> Result<i32, String> {
+//
+//    }
 
     pub fn name(&self) -> &str {
         let str_slice: &str;
@@ -98,15 +100,15 @@ impl<'app_context> Bdev<'app_context> {
     }
 }
 
-pub struct BdevDesc<'app_context> {
+pub struct SpdkBdevDesc<'bdev> {
     raw: *mut raw::spdk_bdev_desc,
-    _marker: marker::PhantomData<&'app_context AppContext>,
+    _marker: marker::PhantomData<&'bdev SpdkBdev>,
 }
 
-impl<'app_context> BdevDesc<'app_context> {
-    pub fn from_raw(raw: *mut raw::spdk_bdev_desc) -> BdevDesc<'app_context> {
+impl<'bdev> SpdkBdevDesc<'bdev> {
+    pub fn from_raw(raw: *mut raw::spdk_bdev_desc) -> SpdkBdevDesc<'bdev> {
         unsafe {
-            BdevDesc {
+            SpdkBdevDesc {
                 raw: raw,
                 _marker: marker::PhantomData
             }
@@ -119,5 +121,21 @@ impl<'app_context> BdevDesc<'app_context> {
 
     pub fn mut_to_raw(&mut self) -> *mut *mut raw::spdk_bdev_desc {
         &mut self.raw
+    }
+}
+
+pub struct SpdkIoChannel<'bdev> {
+    raw: *mut raw::spdk_io_channel,
+    _marker: marker::PhantomData<&'bdev SpdkBdev>,
+}
+
+impl<'bdev> SpdkIoChannel<'bdev> {
+    pub fn from_raw(raw: *mut raw::spdk_io_channel) -> SpdkIoChannel<'bdev> {
+        unsafe {
+            SpdkIoChannel {
+                raw: raw,
+                _marker: marker::PhantomData
+            }
+        }
     }
 }

@@ -12,8 +12,8 @@
  ************************************************************************/
 
 use raw;
-use Bdev;
-use BdevDesc;
+use SpdkBdev;
+use SpdkBdevDesc;
 
 use std::ffi::{CString, CStr};
 use std::os::raw::{c_void, c_char, c_int};
@@ -54,8 +54,8 @@ impl AppContext {
         }
     }
 
-    pub fn bdev(&self) -> Option<Bdev> {
-        Some(Bdev::from_raw(self.bdev))
+    pub fn bdev(&self) -> Option<SpdkBdev> {
+        Some(SpdkBdev::from_raw(self.bdev))
     }
 
     /// set bdev field based on the bdev_name
@@ -71,7 +71,7 @@ impl AppContext {
             let c_str: &CStr = CStr::from_ptr(c_buf);
             str_slice = c_str.to_str().unwrap();
         }
-        let bdev = Bdev::spdk_bdev_get_by_name(str_slice);
+        let bdev = SpdkBdev::spdk_bdev_get_by_name(str_slice);
         match bdev {
             Err(E) => {
                 let s = E.to_owned();
@@ -84,8 +84,8 @@ impl AppContext {
         }
     }
 
-    pub fn bdev_desc(&self) -> Option<BdevDesc> {
-        Some(BdevDesc::from_raw(self.bdev_desc))
+    pub fn bdev_desc(&self) -> Option<SpdkBdevDesc> {
+        Some(SpdkBdevDesc::from_raw(self.bdev_desc))
     }
 
     /// # Parameters
@@ -121,8 +121,8 @@ impl AppContext {
     ///    }
     /// ```
     pub fn spdk_bdev_open(&mut self, write: bool) -> Result<i32, String> {
-        let mut bdev_desc = BdevDesc::from_raw(self.bdev_desc);
-        match Bdev::spdk_bdev_open(&Bdev::from_raw(self.bdev), write, &mut bdev_desc) {
+        let mut bdev_desc = SpdkBdevDesc::from_raw(self.bdev_desc);
+        match SpdkBdev::spdk_bdev_open(&SpdkBdev::from_raw(self.bdev), write, &mut bdev_desc) {
             Err(_e) => {
                 let s = format!("Could not open bdev: {}", self.bdev_name());
                 Err(s)

@@ -13,15 +13,15 @@
 
 extern crate spdk_rs;
 
-use spdk_rs::{spdk_app_stop, AppContext, SpdkAppOpts, Bdev};
+use spdk_rs::{spdk_app_stop, AppContext, SpdkAppOpts, SpdkBdev};
 
 fn hello_start(context: &mut AppContext) {
     println!("Successfully started the application");
-    let mut first_bdev = Bdev::spdk_bdev_first();
+    let mut first_bdev = SpdkBdev::spdk_bdev_first();
     while !first_bdev.is_none() {
         let bdev = first_bdev.unwrap();
         println!("bdev name: {}", bdev.name());
-        first_bdev = Bdev::spdk_bdev_next(&bdev);
+        first_bdev = SpdkBdev::spdk_bdev_next(&bdev);
     }
     match context.set_bdev(){
         Err(_e) => {
