@@ -14,6 +14,9 @@
 use raw;
 use SpdkBdev;
 use SpdkBdevDesc;
+use SpdkBdevIO;
+use SpdkIoChannel;
+use Buf;
 
 use std::ffi::{CString, CStr};
 use std::os::raw::{c_void, c_char, c_int};
@@ -162,6 +165,19 @@ impl AppContext {
         }
     }
 
+    pub fn spdk_bdev_write<F>(&mut self, offset: u64, cb: F) -> Result<i32, String>
+        where
+            F: FnMut(*mut raw::spdk_bdev_io, bool) -> () {
+        let ret = SpdkBdev::spdk_bdev_write(SpdkBdevDesc::from_raw(self.bdev_desc),
+                                            SpdkIoChannel::from_raw(self.bdev_io_channel),
+                                            Buf::from_raw(self.buff as *mut c_void),
+                                            offset,
+                                            unsafe {raw::spdk_bdev_get_block_size(self.bdev) as u64},
+                                            cb,
+        );
+        ret
+    }
+
     pub fn allocate_buff(&mut self) -> Result<i32, String> {
         unsafe {
             self.buff = raw::spdk_dma_zmalloc(raw::spdk_bdev_get_block_size(self.bdev) as usize,
@@ -181,7 +197,7 @@ impl AppContext {
 
     /// hello_nvme_bdev specific function:
     /// write message string into the the allocated buff
-    pub fn write_buff(&mut self, message : &str) {
+    pub fn write_buff(&mut self, message: &str) {
         let owned_fmt = CString::new("%s\n").unwrap();
         let fmt: *const c_char = owned_fmt.as_ptr();
         let owned_content = CString::new(message).unwrap();

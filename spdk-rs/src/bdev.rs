@@ -12,8 +12,8 @@
     because spdk_bdev_open works with struct spdk_bdev* and
     struct spdk_bdev_desc**, which usually used with the context struct.
  ************************************************************************/
-use {raw, AppContext};
-use std::ffi::{CString, CStr};
+use {raw, AppContext, Buf, SpdkBdevIO};
+use std::ffi::{CString, CStr, c_void};
 use std::marker;
 use std::ptr;
 
@@ -52,7 +52,7 @@ impl SpdkBdev {
         }
     }
 
-    pub fn spdk_bdev_open(bdev : &SpdkBdev, write: bool, bdev_desc: &mut SpdkBdevDesc) -> Result<i32, String> {
+    pub fn spdk_bdev_open(bdev: &SpdkBdev, write: bool, bdev_desc: &mut SpdkBdevDesc) -> Result<i32, String> {
         unsafe {
             let rc = raw::spdk_bdev_open(bdev.to_raw(), write, None, ptr::null_mut(), bdev_desc.mut_to_raw());
             match rc != 0 {
@@ -74,16 +74,52 @@ impl SpdkBdev {
             let ptr = raw::spdk_bdev_get_by_name(c_str_ptr);
             if ptr.is_null() {
                 Result::Err(format!("Could not find the bdev: {}", bdev_name))
-            }
-            else {
+            } else {
                 Ok(SpdkBdev::from_raw(ptr))
             }
         }
     }
 
-//    pub fn spdk_bdev_write(desc : SpdkBdevDesc, ch : ) -> Result<i32, String> {
-//
-//    }
+    pub fn spdk_bdev_write<F>(desc: SpdkBdevDesc,
+                              ch: SpdkIoChannel,
+                              buf: Buf,
+                              offset: u64,
+                              nbytes: u64,
+                              f: F) -> Result<i32, String>
+        where
+            F: FnMut(*mut raw::spdk_bdev_io, bool) -> (), {
+        let user_data = &f as *const _ as *mut c_void;
+
+        extern "C" fn start_wrapper<F>(bdev_io: *mut raw::spdk_bdev_io, success: bool, closure: *mut c_void)
+            where
+                F: FnMut(*mut raw::spdk_bdev_io, bool) -> (),
+        {
+            let opt_closure = closure as *mut F;
+            unsafe { (*opt_closure)(bdev_io, success) }
+        }
+
+        let ret;
+        unsafe {
+            ret = raw::spdk_bdev_write(
+                desc.to_raw(),
+                ch.to_raw(),
+                buf.to_raw(),
+                offset,
+                nbytes,
+                Some(start_wrapper::<F>),
+                user_data,
+            );
+        };
+        match ret != 0 {
+            true => {
+                let s = format!("Error while writing to bdev");
+                Err(s)
+            }
+            false => {
+                Ok(0)
+            }
+        }
+    }
 
     pub fn name(&self) -> &str {
         let str_slice: &str;
@@ -100,17 +136,15 @@ impl SpdkBdev {
     }
 }
 
-pub struct SpdkBdevDesc<'bdev> {
+pub struct SpdkBdevDesc {
     raw: *mut raw::spdk_bdev_desc,
-    _marker: marker::PhantomData<&'bdev SpdkBdev>,
 }
 
-impl<'bdev> SpdkBdevDesc<'bdev> {
-    pub fn from_raw(raw: *mut raw::spdk_bdev_desc) -> SpdkBdevDesc<'bdev> {
+impl SpdkBdevDesc {
+    pub fn from_raw(raw: *mut raw::spdk_bdev_desc) -> SpdkBdevDesc {
         unsafe {
             SpdkBdevDesc {
                 raw: raw,
-                _marker: marker::PhantomData
             }
         }
     }
@@ -124,18 +158,20 @@ impl<'bdev> SpdkBdevDesc<'bdev> {
     }
 }
 
-pub struct SpdkIoChannel<'bdev> {
+pub struct SpdkIoChannel {
     raw: *mut raw::spdk_io_channel,
-    _marker: marker::PhantomData<&'bdev SpdkBdev>,
 }
 
-impl<'bdev> SpdkIoChannel<'bdev> {
-    pub fn from_raw(raw: *mut raw::spdk_io_channel) -> SpdkIoChannel<'bdev> {
+impl SpdkIoChannel {
+    pub fn from_raw(raw: *mut raw::spdk_io_channel) -> SpdkIoChannel {
         unsafe {
             SpdkIoChannel {
                 raw: raw,
-                _marker: marker::PhantomData
             }
         }
+    }
+
+    pub fn to_raw(&self) -> *mut raw::spdk_io_channel {
+        self.raw
     }
 }

@@ -7,3 +7,33 @@
     
     FFI for "env.h"
  ************************************************************************/
+
+use raw;
+use std::ffi::{CString, CStr, c_void};
+use std::ptr;
+
+pub struct Buf {
+    raw : *mut c_void
+}
+
+impl Buf {
+    pub fn to_raw(&self) -> *mut c_void {
+        self.raw
+    }
+    pub fn from_raw(raw: *mut c_void) -> Buf {
+        Buf {
+            raw: raw,
+        }
+    }
+}
+
+pub fn spdk_dma_zmalloc(size: usize, align: usize) -> Buf {
+    let ptr;
+    unsafe {
+        ptr = raw::spdk_dma_zmalloc(size, align, ptr::null_mut());
+    };
+    assert!(!ptr.is_null(), "Failed to malloc");
+    Buf {
+        raw: ptr
+    }
+}

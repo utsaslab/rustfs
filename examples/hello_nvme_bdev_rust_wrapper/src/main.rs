@@ -13,7 +13,15 @@
 
 extern crate spdk_rs;
 
-use spdk_rs::{spdk_app_stop, AppContext, SpdkAppOpts, SpdkBdev};
+use spdk_rs::{spdk_app_stop, AppContext, SpdkAppOpts, SpdkBdev, SpdkBdevIO};
+
+//fn write_complete(spdkBdevIo: SpdkBdevIO, success: bool) {
+//    spdk_app_stop(true);
+//}
+
+fn write_complete(spdkBdevIo: SpdkBdevIO, success: bool) {
+    spdk_app_stop(true);
+}
 
 fn hello_start(context: &mut AppContext) {
     println!("Successfully started the application");
@@ -23,11 +31,11 @@ fn hello_start(context: &mut AppContext) {
         println!("bdev name: {}", bdev.name());
         first_bdev = SpdkBdev::spdk_bdev_next(&bdev);
     }
-    match context.set_bdev(){
+    match context.set_bdev() {
         Err(_e) => {
             println!("{}", _e.to_owned());
             spdk_app_stop(false);
-        },
+        }
         Ok(_) => ()
     };
     match context.spdk_bdev_open(true) {
@@ -56,7 +64,15 @@ fn hello_start(context: &mut AppContext) {
     }
     context.write_buff("Hello World!");
     println!("Writing to the bdev");
-
+    match context.spdk_bdev_write(0, write_complete) {
+        Err(_e) => {
+            println!("{}", _e.to_owned());
+            context.spdk_bdev_close();
+            context.spdk_bdev_put_io_channel();
+            spdk_app_stop(false);
+        }
+        Ok(_) => ()
+    }
     context.spdk_bdev_close();
     spdk_app_stop(true);
 }
