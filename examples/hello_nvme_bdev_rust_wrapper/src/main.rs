@@ -13,15 +13,14 @@
 
 extern crate spdk_rs;
 
-use spdk_rs::{spdk_app_stop, AppContext, SpdkAppOpts, SpdkBdev, SpdkBdevIO};
+use spdk_rs::{spdk_app_stop, AppContext, SpdkAppOpts, SpdkBdev, SpdkBdevIO,
+              SpdkBdevIoCompletionCb};
+use std::ffi::c_void;
 
-//fn write_complete(spdkBdevIo: SpdkBdevIO, success: bool) {
+
+//fn write_complete(spdkBdevIo: &mut SpdkBdevIO, success: &mut bool, cb_arg: &mut AppContext) {
 //    spdk_app_stop(true);
 //}
-
-fn write_complete(spdkBdevIo: SpdkBdevIO, success: bool) {
-    spdk_app_stop(true);
-}
 
 fn hello_start(context: &mut AppContext) {
     println!("Successfully started the application");
@@ -64,7 +63,9 @@ fn hello_start(context: &mut AppContext) {
     }
     context.write_buff("Hello World!");
     println!("Writing to the bdev");
-    match context.spdk_bdev_write(0, write_complete) {
+    let mut spdk_bdev_io: SpdkBdevIO;
+    let mut success: bool;
+    match context.spdk_bdev_write(0, context) {
         Err(_e) => {
             println!("{}", _e.to_owned());
             context.spdk_bdev_close();

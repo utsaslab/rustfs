@@ -16,6 +16,8 @@ use {raw, AppContext, Buf, SpdkBdevIO};
 use std::ffi::{CString, CStr, c_void};
 use std::marker;
 use std::ptr;
+//use futures::channel::oneshot;
+//use futures::channel::oneshot::Sender;
 
 pub struct SpdkBdev {
     raw: *mut raw::spdk_bdev,
@@ -80,46 +82,39 @@ impl SpdkBdev {
         }
     }
 
-    pub fn spdk_bdev_write<F>(desc: SpdkBdevDesc,
-                              ch: SpdkIoChannel,
-                              buf: Buf,
-                              offset: u64,
-                              nbytes: u64,
-                              f: F) -> Result<i32, String>
-        where
-            F: FnMut(*mut raw::spdk_bdev_io, bool) -> (), {
-        let user_data = &f as *const _ as *mut c_void;
-
-        extern "C" fn start_wrapper<F>(bdev_io: *mut raw::spdk_bdev_io, success: bool, closure: *mut c_void)
-            where
-                F: FnMut(*mut raw::spdk_bdev_io, bool) -> (),
-        {
-            let opt_closure = closure as *mut F;
-            unsafe { (*opt_closure)(bdev_io, success) }
-        }
-
-        let ret;
-        unsafe {
-            ret = raw::spdk_bdev_write(
-                desc.to_raw(),
-                ch.to_raw(),
-                buf.to_raw(),
-                offset,
-                nbytes,
-                Some(start_wrapper::<F>),
-                user_data,
-            );
-        };
-        match ret != 0 {
-            true => {
-                let s = format!("Error while writing to bdev");
-                Err(s)
-            }
-            false => {
-                Ok(0)
-            }
-        }
-    }
+//    #[async]
+//    pub fn spdk_bdev_write<F>(desc: SpdkBdevDesc,
+//                              ch: SpdkIoChannel,
+//                              buf: Buf,
+//                              offset: u64,
+//                              nbytes: u64,
+//                              f: F) -> Result<i32, String>
+//        where
+//            F: Fn(SpdkBdevIO, bool, *mut c_void) -> (), {
+//
+//        let user_data = &f as *const _ as *mut c_void;
+//        let (sender, receiver) = oneshot::channel();
+//
+//        unsafe {
+//            raw::spdk_bdev_write(
+//                desc.raw,
+//                ch.raw,
+//                buf.to_raw(),
+//                offset,
+//                nbytes,
+//                Some(callback::<f>),
+//                cb_arg(sender),
+//            );
+//        };
+//        let res = await!(receiver).expect("Cancellation is not supported");
+//
+//        match res {
+//            Ok(_) => Ok(0),
+//            Err(_e) => {
+//                Result::Err(format!("Could not write to the device"))
+//            }
+//        }
+//    }
 
     pub fn name(&self) -> &str {
         let str_slice: &str;

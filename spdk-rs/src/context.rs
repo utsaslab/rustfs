@@ -17,11 +17,17 @@ use SpdkBdevDesc;
 use SpdkBdevIO;
 use SpdkIoChannel;
 use Buf;
+use spdk_app_stop;
+//use futures::channel::oneshot;
+//use futures::channel::oneshot::Sender;
 
 use std::ffi::{CString, CStr};
 use std::os::raw::{c_void, c_char, c_int};
 use std::ptr;
 
+pub trait SpdkBdevIoCompletionCb {
+    fn callback(&mut self, bdev_io: SpdkBdevIO, success: bool);
+}
 
 pub struct AppContext {
     bdev: *mut raw::spdk_bdev,
@@ -165,18 +171,49 @@ impl AppContext {
         }
     }
 
-    pub fn spdk_bdev_write<F>(&mut self, offset: u64, cb: F) -> Result<i32, String>
-        where
-            F: FnMut(*mut raw::spdk_bdev_io, bool) -> () {
-        let ret = SpdkBdev::spdk_bdev_write(SpdkBdevDesc::from_raw(self.bdev_desc),
-                                            SpdkIoChannel::from_raw(self.bdev_io_channel),
-                                            Buf::from_raw(self.buff as *mut c_void),
-                                            offset,
-                                            unsafe {raw::spdk_bdev_get_block_size(self.bdev) as u64},
-                                            cb,
-        );
-        ret
+    //    pub fn spdk_bdev_write<F>(&mut self, offset: u64, cb: F) -> Result<i32, String>
+//        where
+//            F: FnMut(*mut raw::spdk_bdev_io, bool) -> () {
+//        let ret = SpdkBdev::spdk_bdev_write(SpdkBdevDesc::from_raw(self.bdev_desc),
+//                                            SpdkIoChannel::from_raw(self.bdev_io_channel),
+//                                            Buf::from_raw(self.buff as *mut c_void),
+//                                            offset,
+//                                            unsafe {raw::spdk_bdev_get_block_size(self.bdev) as u64},
+//                                            cb,
+//        );
+//        ret
+//    }
+    unsafe extern "C" fn spdk_bdev_io_completion_cb<F>(bdev_io: *mut raw::spdk_bdev_io, success: bool, cb_arg: *mut c_void) where
+        F: SpdkBdevIoCompletionCb
+    {
+        let cb = cb_arg as *mut _ as *mut F;
+        (&mut *cb).callback(SpdkBdevIO::from_raw(bdev_io), success);
     }
+
+
+    pub fn spdk_bdev_write<F>(&mut self, offset: u64, cb: F) -> Result<i32, String>
+        where F: SpdkBdevIoCompletionCb {
+        let callback = Box::new(cb);
+        let ret = unsafe {
+            raw::spdk_bdev_write(
+                self.bdev_desc,
+                self.bdev_io_channel,
+                self.buff as *mut c_void,
+                offset,
+                unsafe { raw::spdk_bdev_get_block_size(self.bdev) as u64 },
+                Some(AppContext::spdk_bdev_io_completion_cb::<F>),
+                &*callback as *const _ as *mut c_void,
+            )
+        };
+        std::mem::forget(callback);
+        match ret == 0 {
+            true => Ok(0),
+            false => {
+                Result::Err(format!("Could not write to the device"))
+            }
+        }
+    }
+
 
     pub fn allocate_buff(&mut self) -> Result<i32, String> {
         unsafe {
@@ -205,5 +242,11 @@ impl AppContext {
         unsafe {
             raw::snprintf(self.buff, raw::spdk_bdev_get_block_size(self.bdev) as usize, fmt, content);
         }
+    }
+}
+
+impl SpdkBdevIoCompletionCb for &mut AppContext{
+    fn callback(&mut self, bdev_io: SpdkBdevIO, success: bool) {
+        spdk_app_stop(true);
     }
 }
