@@ -9,6 +9,7 @@
  ************************************************************************/
 
 use raw;
+use std::ptr;
 
 pub struct SpdkBdevIO {
     raw : *mut raw::spdk_bdev_io
@@ -25,5 +26,11 @@ impl SpdkBdevIO {
 
     pub fn to_raw(&self) -> *mut raw::spdk_bdev_io {
         self.raw
+    }
+
+    pub fn new() -> Self{
+        SpdkBdevIO {
+            raw: ptr::null_mut()
+        }
     }
 }
