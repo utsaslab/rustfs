@@ -73,8 +73,7 @@ fn hello_start(context: &mut AppContext) {
     let mut success: bool = false;
     let mut context_cpy = context.clone();
     match context_cpy.spdk_bdev_write(0, ||{
-        println!("{}", context_cpy.bdev_name());
-        write_complete(&mut spdk_bdev_io, &mut success, context)
+        write_complete(&mut spdk_bdev_io, &mut success,  context)
     }) {
         Err(_e) => {
             println!("{}", _e.to_owned());
@@ -84,6 +83,7 @@ fn hello_start(context: &mut AppContext) {
         }
         Ok(_) => ()
     }
+    println!("context bdev_name: {}", context.bdev_name());
     context.spdk_bdev_close();
     spdk_app_stop(true);
 }
