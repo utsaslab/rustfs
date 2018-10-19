@@ -16,11 +16,17 @@ extern crate spdk_rs;
 use spdk_rs::{spdk_app_stop, AppContext, SpdkAppOpts, SpdkBdev, SpdkBdevIO,
               SpdkBdevIoCompletionCb};
 use std::ffi::c_void;
+use std::ptr;
+use std::rc::Rc;
+use std::cell::RefCell;
 
 
-//fn write_complete(spdkBdevIo: &mut SpdkBdevIO, success: &mut bool, cb_arg: &mut AppContext) {
-//    spdk_app_stop(true);
-//}
+fn write_complete(spdkBdevIo: &mut SpdkBdevIO, success: &mut bool, cb_arg: &mut AppContext) {
+    println!("Get to the write_complete");
+    println!("success: {}", success);
+    println!("name: {}", cb_arg.bdev_name());
+    spdk_app_stop(true);
+}
 
 fn hello_start(context: &mut AppContext) {
     println!("Successfully started the application");
@@ -63,9 +69,13 @@ fn hello_start(context: &mut AppContext) {
     }
     context.write_buff("Hello World!");
     println!("Writing to the bdev");
-    let mut spdk_bdev_io: SpdkBdevIO;
-    let mut success: bool;
-    match context.spdk_bdev_write(0, context) {
+    let mut spdk_bdev_io: SpdkBdevIO = SpdkBdevIO::new();
+    let mut success: bool = false;
+    let mut context_cpy = context.clone();
+    match context_cpy.spdk_bdev_write(0, ||{
+        println!("{}", context_cpy.bdev_name());
+        write_complete(&mut spdk_bdev_io, &mut success, context)
+    }) {
         Err(_e) => {
             println!("{}", _e.to_owned());
             context.spdk_bdev_close();

@@ -37,6 +37,18 @@ pub struct AppContext {
     bdev_name: *const c_char,
 }
 
+impl Clone for AppContext {
+    fn clone(&self) -> AppContext {
+        AppContext{
+            bdev: self.bdev,
+            bdev_desc : self.bdev_desc,
+            bdev_io_channel: self.bdev_io_channel,
+            buff: self.buff,
+            bdev_name: self.bdev_name
+        }
+    }
+}
+
 impl AppContext {
     pub fn new() -> AppContext {
         AppContext {
@@ -184,15 +196,15 @@ impl AppContext {
 //        ret
 //    }
     unsafe extern "C" fn spdk_bdev_io_completion_cb<F>(bdev_io: *mut raw::spdk_bdev_io, success: bool, cb_arg: *mut c_void) where
-        F: SpdkBdevIoCompletionCb
+        F: FnMut() -> ()
     {
-        let cb = cb_arg as *mut _ as *mut F;
-        (&mut *cb).callback(SpdkBdevIO::from_raw(bdev_io), success);
+        let opt_closure = cb_arg as *mut F;
+        unsafe { (*opt_closure)() }
     }
 
 
-    pub fn spdk_bdev_write<F>(&mut self, offset: u64, cb: F) -> Result<i32, String>
-        where F: SpdkBdevIoCompletionCb {
+    pub fn spdk_bdev_write<F>(&self, offset: u64, cb: F) -> Result<i32, String>
+        where F: FnMut() -> () {
         let callback = Box::new(cb);
         let ret = unsafe {
             raw::spdk_bdev_write(
@@ -245,8 +257,8 @@ impl AppContext {
     }
 }
 
-impl SpdkBdevIoCompletionCb for &mut AppContext{
-    fn callback(&mut self, bdev_io: SpdkBdevIO, success: bool) {
-        spdk_app_stop(true);
-    }
-}
+//impl SpdkBdevIoCompletionCb for &mut AppContext{
+//    fn callback(&mut self, bdev_io: SpdkBdevIO, success: bool) {
+//        spdk_app_stop(true);
+//    }
+//}
