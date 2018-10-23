@@ -16,8 +16,24 @@ use {raw, AppContext, Buf, SpdkBdevIO};
 use std::ffi::{CString, CStr, c_void};
 use std::marker;
 use std::ptr;
-//use futures::channel::oneshot;
-//use futures::channel::oneshot::Sender;
+
+use failure::Error;
+use futures::sync::oneshot::Sender;
+use futures::sync::oneshot;
+use futures::prelude::*;
+use futures::prelude::{async, await};
+
+#[derive(Debug, Fail)]
+pub enum BdevError {
+    #[fail(
+    display = "Error in write completion({}): {}, offset: {}, length: {}",
+    _0,
+    _1,
+    _2,
+    _3
+    )]
+    WriteError(String, i32, u64, u64),
+}
 
 pub struct SpdkBdev {
     raw: *mut raw::spdk_bdev,
@@ -82,39 +98,45 @@ impl SpdkBdev {
         }
     }
 
-//    #[async]
-//    pub fn spdk_bdev_write<F>(desc: SpdkBdevDesc,
-//                              ch: SpdkIoChannel,
-//                              buf: Buf,
-//                              offset: u64,
-//                              nbytes: u64,
-//                              f: F) -> Result<i32, String>
-//        where
-//            F: Fn(SpdkBdevIO, bool, *mut c_void) -> (), {
-//
-//        let user_data = &f as *const _ as *mut c_void;
-//        let (sender, receiver) = oneshot::channel();
-//
-//        unsafe {
-//            raw::spdk_bdev_write(
-//                desc.raw,
-//                ch.raw,
-//                buf.to_raw(),
-//                offset,
-//                nbytes,
-//                Some(callback::<f>),
-//                cb_arg(sender),
-//            );
-//        };
-//        let res = await!(receiver).expect("Cancellation is not supported");
-//
-//        match res {
-//            Ok(_) => Ok(0),
-//            Err(_e) => {
-//                Result::Err(format!("Could not write to the device"))
-//            }
-//        }
-//    }
+    #[async]
+    pub fn spdk_bdev_write(desc: SpdkBdevDesc,
+                           ch: SpdkIoChannel,
+                           buf: Buf,
+                           offset: u64,
+                           nbytes: u64) -> Result<SpdkBdevIO, Error> {
+        let (sender, receiver) = oneshot::channel();
+
+        unsafe {
+            raw::spdk_bdev_write(
+                desc.raw,
+                ch.raw,
+                buf.to_raw(),
+                offset,
+                nbytes,
+                Some(spdk_bdev_io_completion_cb),
+                cb_arg::<*mut raw::spdk_bdev_io>(sender),
+            );
+        }
+        let res = await!(receiver).expect("Cancellation is not supported");
+
+        match res {
+            Ok(bdev_io) => Ok(
+                SpdkBdevIO::from_raw(bdev_io)
+            ),
+            Err(_e) => Err(BdevError::WriteError(
+                desc.spdk_bdev_desc_get_bdev().name().to_string(),
+                -1,
+                offset,
+                nbytes,
+            ))?,
+        }
+    }
+
+    pub fn spdk_bdev_get_block_size(bdev : SpdkBdev) -> u32 {
+        unsafe {
+            raw::spdk_bdev_get_block_size(bdev.to_raw())
+        }
+    }
 
     pub fn name(&self) -> &str {
         let str_slice: &str;
@@ -151,6 +173,16 @@ impl SpdkBdevDesc {
     pub fn mut_to_raw(&mut self) -> *mut *mut raw::spdk_bdev_desc {
         &mut self.raw
     }
+
+    pub fn spdk_bdev_desc_get_bdev(&self) -> SpdkBdev {
+        let ptr;
+        unsafe {
+            ptr = raw::spdk_bdev_desc_get_bdev(self.raw);
+        }
+        SpdkBdev {
+            raw: ptr
+        }
+    }
 }
 
 pub struct SpdkIoChannel {
@@ -169,4 +201,18 @@ impl SpdkIoChannel {
     pub fn to_raw(&self) -> *mut raw::spdk_io_channel {
         self.raw
     }
+}
+
+fn cb_arg<T>(sender: Sender<Result<T, i32>>) -> *mut c_void {
+    Box::into_raw(Box::new(sender)) as *const _ as *mut c_void
+}
+
+extern "C" fn spdk_bdev_io_completion_cb(bdev_io: *mut raw::spdk_bdev_io, success: bool, sender_ptr: *mut c_void) {
+    let sender = unsafe { Box::from_raw(sender_ptr as *mut Sender<Result<*mut raw::spdk_bdev_io, i32>>) };
+    let ret = if !success {
+        Err(-1)
+    } else {
+        Ok(bdev_io)
+    };
+    sender.send(ret).expect("Receiver is gone");
 }

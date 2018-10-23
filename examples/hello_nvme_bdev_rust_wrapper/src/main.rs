@@ -10,6 +10,10 @@
 
  ************************************************************************/
 #![feature(nll)]
+#![feature(await_macro)]
+#![feature(proc_macro, generators)]
+
+extern crate futures_await as futures;
 
 extern crate spdk_rs;
 
@@ -20,6 +24,7 @@ use std::ptr;
 use std::rc::Rc;
 use std::cell::RefCell;
 
+use futures::Future;
 
 fn write_complete(spdkBdevIo: &mut SpdkBdevIO, success: &mut bool, cb_arg: &mut AppContext) {
     println!("Get to the write_complete");
@@ -68,22 +73,37 @@ fn hello_start(context: &mut AppContext) {
         Ok(_) => ()
     }
     context.write_buff("Hello World!");
+
     println!("Writing to the bdev");
-    let mut spdk_bdev_io: SpdkBdevIO = SpdkBdevIO::new();
-    let mut success: bool = false;
-    let mut context_cpy = context.clone();
-    match context_cpy.spdk_bdev_write(0, ||{
-        write_complete(&mut spdk_bdev_io, &mut success,  context)
-    }) {
-        Err(_e) => {
-            println!("{}", _e.to_owned());
-            context.spdk_bdev_close();
-            context.spdk_bdev_put_io_channel();
-            spdk_app_stop(false);
+    let blk_size = SpdkBdev::spdk_bdev_get_block_size(context.bdev().unwrap());
+    let mut spdk_bdev_io : SpdkBdevIO;
+    SpdkBdev::spdk_bdev_write(context.bdev_desc().unwrap(),
+                                    context.bdev_io_channel(),
+                                    context.buff(),
+                                    0,
+                                    blk_size as u64).then(|result| {
+        match result {
+            Ok(bdev_io) => spdk_bdev_io = bdev_io,
+            Err(_e) => spdk_bdev_io = SpdkBdevIO::new()
         }
-        Ok(_) => ()
-    }
-    println!("context bdev_name: {}", context.bdev_name());
+    });
+
+
+//    let mut spdk_bdev_io: SpdkBdevIO = SpdkBdevIO::new();
+//    let mut success: bool = false;
+//    let mut context_cpy = context.clone();
+//    match context_cpy.spdk_bdev_write(0, ||{
+//        write_complete(&mut spdk_bdev_io, &mut success,  context)
+//    }) {
+//        Err(_e) => {
+//            println!("{}", _e.to_owned());
+//            context.spdk_bdev_close();
+//            context.spdk_bdev_put_io_channel();
+//            spdk_app_stop(false);
+//        }
+//        Ok(_) => ()
+//    }
+//    println!("context bdev_name: {}", context.bdev_name());
     context.spdk_bdev_close();
     spdk_app_stop(true);
 }

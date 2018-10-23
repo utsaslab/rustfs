@@ -244,6 +244,14 @@ impl AppContext {
         }
     }
 
+    pub fn bdev_io_channel(&self) -> SpdkIoChannel {
+        SpdkIoChannel::from_raw(self.bdev_io_channel)
+    }
+
+    pub fn buff(&self) -> Buf {
+        Buf::from_raw(self.buff as *mut c_void)
+    }
+
     /// hello_nvme_bdev specific function:
     /// write message string into the the allocated buff
     pub fn write_buff(&mut self, message: &str) {
