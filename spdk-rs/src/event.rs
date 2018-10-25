@@ -8,7 +8,9 @@
     FFI for "event.h"
  ************************************************************************/
 
-use {raw, SpdkBdev, SpdkBdevDesc};
+use crate::bdev::{SpdkBdev, SpdkBdevDesc};
+use crate::raw;
+
 use failure::Error;
 use std::os::raw::{c_char, c_void};
 use std::ffi::{CStr, CString};

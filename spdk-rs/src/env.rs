@@ -8,7 +8,7 @@
     FFI for "env.h"
  ************************************************************************/
 
-use raw;
+use crate::raw;
 use std::ffi::{CString, CStr, c_void};
 use std::ptr;
 

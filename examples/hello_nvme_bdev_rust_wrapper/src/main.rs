@@ -10,11 +10,11 @@
 
  ************************************************************************/
 #![feature(nll)]
-#![feature(await_macro)]
+#![feature(await_macro, async_await)]
 #![feature(proc_macro, generators)]
+#![feature(futures_api)]
 
-extern crate futures_await as futures;
-
+extern crate futures;
 extern crate spdk_rs;
 
 use spdk_rs::{spdk_app_stop, AppContext, SpdkAppOpts, SpdkBdev, SpdkBdevIO,
@@ -24,7 +24,9 @@ use std::ptr;
 use std::rc::Rc;
 use std::cell::RefCell;
 
-use futures::Future;
+use futures::future::Future;
+use futures::executor::block_on;
+use futures::FutureExt;
 
 fn write_complete(spdkBdevIo: &mut SpdkBdevIO, success: &mut bool, cb_arg: &mut AppContext) {
     println!("Get to the write_complete");
@@ -76,18 +78,28 @@ fn hello_start(context: &mut AppContext) {
 
     println!("Writing to the bdev");
     let blk_size = SpdkBdev::spdk_bdev_get_block_size(context.bdev().unwrap());
-    let mut spdk_bdev_io : SpdkBdevIO;
-    SpdkBdev::spdk_bdev_write(context.bdev_desc().unwrap(),
-                                    context.bdev_io_channel(),
-                                    context.buff(),
-                                    0,
-                                    blk_size as u64).then(|result| {
-        match result {
-            Ok(bdev_io) => spdk_bdev_io = bdev_io,
-            Err(_e) => spdk_bdev_io = SpdkBdevIO::new()
-        }
-    });
-
+    let mut spdk_bdev_io: SpdkBdevIO;
+//    SpdkBdev::spdk_bdev_write(context.bdev_desc().unwrap(),
+//                                    context.bdev_io_channel(),
+//                                    context.buff(),
+//                                    0,
+//                                    blk_size as u64).then(|result| {
+//        match result {
+//            Ok(bdev_io) => spdk_bdev_io = bdev_io,
+//            Err(_e) => spdk_bdev_io = SpdkBdevIO::new()
+//        }
+//    });
+    let future = SpdkBdev::spdk_bdev_write(context.bdev_desc().unwrap(),
+                                           context.bdev_io_channel(),
+                                           context.buff(),
+                                           0,
+                                           blk_size as u64);
+//    match block_on(future) {
+//        Ok(bdev_io) => spdk_bdev_io = bdev_io,
+//        Err(_e) => {}
+//    }
+    block_on(future).unwrap();
+    println!("Get to the write_complete");
 
 //    let mut spdk_bdev_io: SpdkBdevIO = SpdkBdevIO::new();
 //    let mut success: bool = false;
@@ -108,8 +120,23 @@ fn hello_start(context: &mut AppContext) {
     spdk_app_stop(true);
 }
 
+async fn print_async() {
+    println!("Hello from print_async");
+}
+
+async fn print_async2() -> Result<i32, String> {
+    Ok(10)
+}
+
 fn main()
 {
+    // Some test code to be deleted.
+    let future = print_async();
+    let future2 = print_async2();
+    println!("Hello from main");
+    block_on(future);
+    println!("{}", block_on(future2).unwrap());
+
     println!("Enter main");
     let mut opts = SpdkAppOpts::new();
     opts.name("hello_bdev");

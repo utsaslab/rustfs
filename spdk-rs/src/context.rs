@@ -11,15 +11,13 @@
 
  ************************************************************************/
 
-use raw;
-use SpdkBdev;
-use SpdkBdevDesc;
-use SpdkBdevIO;
-use SpdkIoChannel;
-use Buf;
-use spdk_app_stop;
-//use futures::channel::oneshot;
-//use futures::channel::oneshot::Sender;
+use crate::raw;
+use crate::SpdkBdev;
+use crate::SpdkBdevDesc;
+use crate::SpdkBdevIO;
+use crate::SpdkIoChannel;
+use crate::Buf;
+use crate::spdk_app_stop;
 
 use std::ffi::{CString, CStr};
 use std::os::raw::{c_void, c_char, c_int};

@@ -12,16 +12,20 @@
     because spdk_bdev_open works with struct spdk_bdev* and
     struct spdk_bdev_desc**, which usually used with the context struct.
  ************************************************************************/
-use {raw, AppContext, Buf, SpdkBdevIO};
+
+use crate::raw;
+use crate::AppContext;
+use crate::Buf;
+use crate::SpdkBdevIO;
+
 use std::ffi::{CString, CStr, c_void};
 use std::marker;
 use std::ptr;
 
 use failure::Error;
-use futures::sync::oneshot::Sender;
-use futures::sync::oneshot;
-use futures::prelude::*;
-use futures::prelude::{async, await};
+
+use futures::channel::oneshot::Sender;
+use futures::channel::oneshot;
 
 #[derive(Debug, Fail)]
 pub enum BdevError {
@@ -98,25 +102,26 @@ impl SpdkBdev {
         }
     }
 
-    #[async]
-    pub fn spdk_bdev_write(desc: SpdkBdevDesc,
-                           ch: SpdkIoChannel,
-                           buf: Buf,
-                           offset: u64,
-                           nbytes: u64) -> Result<SpdkBdevIO, Error> {
+    pub async fn spdk_bdev_write(desc: SpdkBdevDesc,
+                                 ch: SpdkIoChannel,
+                                 buf: Buf,
+                                 offset: u64,
+                                 nbytes: u64) -> Result<SpdkBdevIO, Error> {
         let (sender, receiver) = oneshot::channel();
 
+        let ret: i32;
         unsafe {
-            raw::spdk_bdev_write(
+            ret = raw::spdk_bdev_write(
                 desc.raw,
                 ch.raw,
                 buf.to_raw(),
                 offset,
                 nbytes,
                 Some(spdk_bdev_io_completion_cb),
-                cb_arg::<*mut raw::spdk_bdev_io>(sender),
+                cb_arg::<*mut raw::spdk_bdev_io>(sender), // TODO: we probably need to modify here to take in closure again as we need to indicate when callback need to call spdk_app_stop()
             );
-        }
+        };
+        // TODO: we probably need to handle the case where ret != 0
         let res = await!(receiver).expect("Cancellation is not supported");
 
         match res {
@@ -132,7 +137,7 @@ impl SpdkBdev {
         }
     }
 
-    pub fn spdk_bdev_get_block_size(bdev : SpdkBdev) -> u32 {
+    pub fn spdk_bdev_get_block_size(bdev: SpdkBdev) -> u32 {
         unsafe {
             raw::spdk_bdev_get_block_size(bdev.to_raw())
         }
@@ -208,11 +213,8 @@ fn cb_arg<T>(sender: Sender<Result<T, i32>>) -> *mut c_void {
 }
 
 extern "C" fn spdk_bdev_io_completion_cb(bdev_io: *mut raw::spdk_bdev_io, success: bool, sender_ptr: *mut c_void) {
+    println!("[spdk_bdev_io_completion_cb]");
     let sender = unsafe { Box::from_raw(sender_ptr as *mut Sender<Result<*mut raw::spdk_bdev_io, i32>>) };
-    let ret = if !success {
-        Err(-1)
-    } else {
-        Ok(bdev_io)
-    };
+    let ret = if !success { Err(-1) } else { Ok(bdev_io) };
     sender.send(ret).expect("Receiver is gone");
 }

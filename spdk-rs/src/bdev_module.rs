@@ -8,7 +8,7 @@
     FFI for "bdev_module.h"
  ************************************************************************/
 
-use raw;
+use crate::raw;
 use std::ptr;
 
 pub struct SpdkBdevIO {
