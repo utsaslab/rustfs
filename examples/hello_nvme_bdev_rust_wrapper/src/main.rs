@@ -16,6 +16,7 @@
 
 extern crate futures;
 extern crate spdk_rs;
+extern crate tokio_core;
 
 use spdk_rs::{spdk_app_stop, AppContext, SpdkAppOpts, SpdkBdev, SpdkBdevIO,
               SpdkBdevIoCompletionCb};
@@ -27,6 +28,7 @@ use std::cell::RefCell;
 use futures::future::Future;
 use futures::executor::block_on;
 use futures::FutureExt;
+use tokio_core::reactor::Core;
 
 fn write_complete(spdkBdevIo: &mut SpdkBdevIO, success: &mut bool, cb_arg: &mut AppContext) {
     println!("Get to the write_complete");
@@ -89,16 +91,31 @@ fn hello_start(context: &mut AppContext) {
 //            Err(_e) => spdk_bdev_io = SpdkBdevIO::new()
 //        }
 //    });
-    let future = SpdkBdev::spdk_bdev_write(context.bdev_desc().unwrap(),
-                                           context.bdev_io_channel(),
-                                           context.buff(),
-                                           0,
-                                           blk_size as u64);
+    println!("92");
+//    let future = SpdkBdev::spdk_bdev_write(context.bdev_desc().unwrap(),
+//                                           context.bdev_io_channel(),
+//                                           context.buff(),
+//                                           0,
+//                                           blk_size as u64);
+
+//    let future = SpdkBdev::spdk_bdev_write(context.bdev_desc().unwrap(),
+//                                           context.bdev_io_channel(),
+//                                           context.buff(),
+//                                           0,
+//                                           blk_size as u64);
+
 //    match block_on(future) {
 //        Ok(bdev_io) => spdk_bdev_io = bdev_io,
 //        Err(_e) => {}
 //    }
-    block_on(future).unwrap();
+    futures::executor::block_on(
+            SpdkBdev::spdk_bdev_write(context.bdev_desc().unwrap(),
+                                           context.bdev_io_channel(),
+                                           context.buff(),
+                                           0,
+                                           blk_size as u64)
+    );
+//    block_on(future).unwrap();
     println!("Get to the write_complete");
 
 //    let mut spdk_bdev_io: SpdkBdevIO = SpdkBdevIO::new();

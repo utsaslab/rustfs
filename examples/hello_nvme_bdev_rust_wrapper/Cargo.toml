@@ -6,3 +6,4 @@ authors = ["xxks-kkk <ferrishu3886@gmail.com>"]
 [dependencies]
 spdk-rs = { path="../../spdk-rs"}
 futures-preview = "0.3.0-alpha.9"
+tokio-core = "0.1.17"
