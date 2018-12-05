@@ -3,12 +3,8 @@ of how we can invoke SPDK library using Rust.
 
 ## Usage
 
-Pointing `SPDK_INSTALL_DIR` to the installation location of SPDK and run the following commands:
-
 ```
-$ export SPDK_INSTALL_DIR=$HOME/spdk_install
-$ export RUSTFLAGS="-C link-arg=$SPDK_INSTALL_DIR/lib/libspdk.so"
-$ sudo -E $HOME/.cargo/bin/cargo run
+sudo ./run.sh
 ```
 
 More details see [Pull Request #14](https://github.com/utsaslab/rustfs/pull/14)
