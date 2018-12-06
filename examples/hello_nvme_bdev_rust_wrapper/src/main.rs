@@ -108,13 +108,13 @@ fn hello_start(context: &mut AppContext) {
 //        Ok(bdev_io) => spdk_bdev_io = bdev_io,
 //        Err(_e) => {}
 //    }
-    futures::executor::block_on(
-            SpdkBdev::spdk_bdev_write(context.bdev_desc().unwrap(),
-                                           context.bdev_io_channel(),
-                                           context.buff(),
-                                           0,
-                                           blk_size as u64)
-    );
+    // futures::executor::block_on(
+    //         SpdkBdev::spdk_bdev_write(context.bdev_desc().unwrap(),
+    //                                        context.bdev_io_channel(),
+    //                                        context.buff(),
+    //                                        0,
+    //                                        blk_size as u64)
+    // );
 //    block_on(future).unwrap();
     println!("Get to the write_complete");
 
@@ -157,7 +157,7 @@ fn main()
     println!("Enter main");
     let mut opts = SpdkAppOpts::new();
     opts.name("hello_bdev");
-    opts.config_file("/home/zeyuanhu/rustfs/examples/hello_nvme_bdev/bdev.conf");
+    opts.config_file("/home/ubuntu/rustfs/examples/hello_nvme_bdev_rust_wrapper/bdev.conf");
 
     let mut context = AppContext::new();
     context.set_bdev_name("Nvme0n1");
