@@ -12,7 +12,11 @@ fn main() {
     };
 
     let include_path_spdk_dir = format!("-I{}/include", _spdk_install_dir);
-
+    
+    let _rustflags = match env::var("RUSTFLAGS") {
+        Ok(val) => val,
+        Err(_e) => panic!("RUSTFLAGS is not defined in the environment")
+    };
     // The bindgen::Builder is the main entry point
     // to bindgen, and lets you build up options for
     // the resulting bindings.
