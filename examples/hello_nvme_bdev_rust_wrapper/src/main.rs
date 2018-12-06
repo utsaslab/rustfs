@@ -24,6 +24,7 @@ use std::ffi::c_void;
 use std::ptr;
 use std::rc::Rc;
 use std::cell::RefCell;
+use std::path::Path;
 
 use futures::future::Future;
 use futures::executor::block_on;
@@ -157,7 +158,8 @@ fn main()
     println!("Enter main");
     let mut opts = SpdkAppOpts::new();
     opts.name("hello_bdev");
-    opts.config_file("/home/ubuntu/rustfs/examples/hello_nvme_bdev_rust_wrapper/bdev.conf");
+    let config_file = Path::new("bdev.conf").canonicalize().unwrap();
+    opts.config_file(config_file.to_str().unwrap());
 
     let mut context = AppContext::new();
     context.set_bdev_name("Nvme0n1");
