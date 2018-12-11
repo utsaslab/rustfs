@@ -50,6 +50,7 @@ pub struct SpdkBdev {
     raw: *mut raw::spdk_bdev,
 }
 
+/// spdk_bdev_get_by_name()
 pub fn get_by_name<S>(bdev_name: S) -> Result<SpdkBdev, Error>
 where
     S: Into<String> + Clone,
@@ -66,6 +67,7 @@ where
     Ok(SpdkBdev::from_raw(bdev))
 }
 
+/// spdk_bdev_open()
 pub fn open(bdev: &SpdkBdev, write: bool, bdev_desc: &mut SpdkBdevDesc) -> Result<(), Error> {
     unsafe {
         let rc = raw::spdk_bdev_open(bdev.to_raw(), write, None, ptr::null_mut(), bdev_desc.mut_to_raw());
@@ -80,13 +82,14 @@ pub fn open(bdev: &SpdkBdev, write: bool, bdev_desc: &mut SpdkBdevDesc) -> Resul
     }
 }
 
+/// spdk_bdev_close()
 pub fn close(bdev_desc: SpdkBdevDesc) {
     unsafe {
         raw::spdk_bdev_close(bdev_desc.to_raw())
     }
 }
 
-
+/// spdk_bdev_first()
 pub fn first() -> Option<SpdkBdev> {
     unsafe {
         let ptr = raw::spdk_bdev_first();
@@ -98,6 +101,7 @@ pub fn first() -> Option<SpdkBdev> {
     }
 }
 
+/// spdk_bdev_next()
 pub fn next(prev: &SpdkBdev) -> Option<SpdkBdev> {
     unsafe {
         let ptr = raw::spdk_bdev_next(prev.raw);
