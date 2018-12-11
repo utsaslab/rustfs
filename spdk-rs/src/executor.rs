@@ -1,7 +1,5 @@
-#![warn(rust_2018_idioms)]
-#![feature(pin, arbitrary_self_types, futures_api, nll)]
-
 extern crate futures;
+extern crate tokio;
 
 use futures::future::Future;
 use futures::future::LocalFutureObj;
@@ -304,9 +302,7 @@ fn forget_rc(task_handle: Rc<TaskHandle>) {
     let _ = Rc::into_raw(task_handle);
 }
 
-#[cfg(test)]
-#[macro_use]
-extern crate hamcrest2;
+
 
 #[cfg(test)]
 mod tests {
