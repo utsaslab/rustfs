@@ -14,12 +14,13 @@
     - This program doesn't support the input arguments like "hello_nvme_bdev.c"
     If you want to work with customized path to bdev.conf, please modify the line:
 
-      let owned_config_file = CString::new("/home/zeyuanhu/rustfs/examples/hello_nvme_bdev/bdev.conf").unwrap();
+        
+        let owned_config_file = CString::new("bdev.conf").unwrap();
 
     - Similary, if you want to use different bdev name (i.e. value after -b in
     "hello_nvme_bdev.c"), please modify the line:
 
-      let owned_bdev_name = CString::new("Nvme0n1").unwrap();
+        let owned_bdev_name = CString::new("Nvme0n1").unwrap();
  ************************************************************************/
 
 #![allow(non_upper_case_globals)]
@@ -202,7 +203,7 @@ fn main() {
         let owned_name = CString::new("hello_bdev").unwrap();
         opts.name = owned_name.as_ptr();
 
-        let owned_config_file = CString::new("/home/zeyuanhu/rustfs/examples/hello_nvme_bdev/bdev.conf").unwrap();
+        let owned_config_file = CString::new("bdev.conf").unwrap();
         opts.config_file = owned_config_file.as_ptr();
 
         let owned_bdev_name = CString::new("Nvme0n1").unwrap();
