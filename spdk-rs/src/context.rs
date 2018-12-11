@@ -17,11 +17,13 @@ use crate::SpdkBdevDesc;
 use crate::SpdkBdevIO;
 use crate::SpdkIoChannel;
 use crate::Buf;
-use crate::spdk_app_stop;
+use crate::bdev;
 
 use std::ffi::{CString, CStr};
 use std::os::raw::{c_void, c_char, c_int};
 use std::ptr;
+
+use failure::Error;
 
 pub trait SpdkBdevIoCompletionCb {
     fn callback(&mut self, bdev_io: SpdkBdevIO, success: bool);
@@ -83,22 +85,21 @@ impl AppContext {
     /// duplicate code of bdev_name. The reason we doing so as a way to workaround
     /// the borrow checker. See more info about the issue I'm facing during the implementation
     /// [here](https://stackoverflow.com/questions/52709147/how-to-workaround-the-coexistence-of-a-mutable-and-immutable-borrow)
-    pub fn set_bdev(&mut self) -> Result<i32, String> {
+    pub fn set_bdev(&mut self) -> Result<(), Error> {
         let str_slice;
         unsafe {
             let c_buf: *const c_char = self.bdev_name;
             let c_str: &CStr = CStr::from_ptr(c_buf);
             str_slice = c_str.to_str().unwrap();
         }
-        let bdev = SpdkBdev::spdk_bdev_get_by_name(str_slice);
+        let bdev = bdev::get_by_name(str_slice);
         match bdev {
             Err(E) => {
-                let s = E.to_owned();
-                Err(s)
+                Err(E)?
             }
             Ok(T) => {
                 self.bdev = T.to_raw();
-                Ok(0)
+                Ok(())
             }
         }
     }
@@ -139,19 +140,19 @@ impl AppContext {
     ///        }
     ///    }
     /// ```
-    pub fn spdk_bdev_open(&mut self, write: bool) -> Result<i32, String> {
-        let mut bdev_desc = SpdkBdevDesc::from_raw(self.bdev_desc);
-        match SpdkBdev::spdk_bdev_open(&SpdkBdev::from_raw(self.bdev), write, &mut bdev_desc) {
-            Err(_e) => {
-                let s = format!("Could not open bdev: {}", self.bdev_name());
-                Err(s)
-            }
-            Ok(_) => {
-                self.bdev_desc = bdev_desc.to_raw();
-                Ok(0)
-            }
-        }
-    }
+//    pub fn spdk_bdev_open(&mut self, write: bool) -> Result<i32, String> {
+//        let mut bdev_desc = SpdkBdevDesc::from_raw(self.bdev_desc);
+//        match SpdkBdev::spdk_bdev_open(&SpdkBdev::from_raw(self.bdev), write, &mut bdev_desc) {
+//            Err(_e) => {
+//                let s = format!("Could not open bdev: {}", self.bdev_name());
+//                Err(s)
+//            }
+//            Ok(_) => {
+//                self.bdev_desc = bdev_desc.to_raw();
+//                Ok(0)
+//            }
+//        }
+//    }
 
     pub fn spdk_bdev_close(&mut self) {
         unsafe {

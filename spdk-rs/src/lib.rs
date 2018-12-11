@@ -1,23 +1,26 @@
 #![feature(nll)]
-#![feature(tool_lints)]
+#![feature(pin)]
 #![warn(rust_2018_idioms)]
 #![feature(async_await, await_macro, futures_api)]
-#![feature(use_extern_macros)]
+#![feature(tool_lints)]
+#![allow(macro_use_extern_crate)]
+#![feature(uniform_paths)]
 
 extern crate libspdk_sys as raw;
 #[macro_use]
 extern crate failure;
 extern crate libc;
-extern crate futures;
 
-mod event;
-mod bdev;
+pub mod event;
+pub mod bdev;
 mod context;
-mod env;
+pub mod env;
 mod bdev_module;
+pub mod executor;
+pub mod io_channel;
 
-pub use crate::event::{SpdkAppOpts, spdk_app_stop};
-pub use crate::bdev::{SpdkBdev, SpdkBdevDesc, SpdkIoChannel};
-pub use crate::context::{AppContext, SpdkBdevIoCompletionCb};
-pub use crate::env::{Buf};
-pub use crate::bdev_module::{SpdkBdevIO};
+pub use event::{SpdkAppOpts, app_stop};
+pub use bdev::{SpdkBdev, SpdkBdevDesc, SpdkIoChannel};
+pub use context::{AppContext, SpdkBdevIoCompletionCb};
+pub use env::{Buf};
+pub use bdev_module::{SpdkBdevIO};

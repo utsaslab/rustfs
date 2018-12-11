@@ -14,10 +14,8 @@
  ************************************************************************/
 
 use crate::raw;
-use crate::AppContext;
-use crate::Buf;
 use crate::SpdkBdevIO;
-use crate::spdk_app_stop;
+use crate::env;
 
 use std::ffi::{CString, CStr, c_void};
 use std::marker;
@@ -40,10 +38,75 @@ pub enum BdevError {
     _3
     )]
     WriteError(String, i32, u64, u64),
+
+    #[fail(display = "Could not find a bdev: {}", _0)]
+    NotFound(String),
+
+    #[fail(display = "Could not open device: {}", _0)]
+    OpenError(String),
 }
 
 pub struct SpdkBdev {
     raw: *mut raw::spdk_bdev,
+}
+
+pub fn get_by_name<S>(bdev_name: S) -> Result<SpdkBdev, Error>
+where
+    S: Into<String> + Clone,
+{
+    let name_cstring = CString::new(bdev_name.clone().into()).expect("Couldn't create a string");
+
+    let bdev = unsafe {
+        raw::spdk_bdev_get_by_name(name_cstring.as_ptr())
+    };
+    if bdev.is_null() {
+        return Err(BdevError::NotFound(bdev_name.clone().into()))?;
+    }
+
+    Ok(SpdkBdev::from_raw(bdev))
+}
+
+pub fn open(bdev: &SpdkBdev, write: bool, bdev_desc: &mut SpdkBdevDesc) -> Result<(), Error> {
+    unsafe {
+        let rc = raw::spdk_bdev_open(bdev.to_raw(), write, None, ptr::null_mut(), bdev_desc.mut_to_raw());
+        match rc != 0 {
+            true => {
+                Err(BdevError::OpenError(bdev.name().to_string()))?
+            }
+            false => {
+                Ok(())
+            }
+        }
+    }
+}
+
+pub fn close(bdev_desc: SpdkBdevDesc) {
+    unsafe {
+        raw::spdk_bdev_close(bdev_desc.to_raw())
+    }
+}
+
+
+pub fn first() -> Option<SpdkBdev> {
+    unsafe {
+        let ptr = raw::spdk_bdev_first();
+        if ptr.is_null() {
+            None
+        } else {
+            Some(SpdkBdev::from_raw(ptr))
+        }
+    }
+}
+
+pub fn next(prev: &SpdkBdev) -> Option<SpdkBdev> {
+    unsafe {
+        let ptr = raw::spdk_bdev_next(prev.raw);
+        if ptr.is_null() {
+            None
+        } else {
+            Some(SpdkBdev::from_raw(ptr))
+        }
+    }
 }
 
 impl SpdkBdev {
@@ -55,55 +118,12 @@ impl SpdkBdev {
         }
     }
 
-    pub fn spdk_bdev_first() -> Option<SpdkBdev> {
-        unsafe {
-            let ptr = raw::spdk_bdev_first();
-            if ptr.is_null() {
-                None
-            } else {
-                Some(SpdkBdev::from_raw(ptr))
-            }
-        }
-    }
 
-    pub fn spdk_bdev_next(prev: &SpdkBdev) -> Option<SpdkBdev> {
-        unsafe {
-            let ptr = raw::spdk_bdev_next(prev.raw);
-            if ptr.is_null() {
-                None
-            } else {
-                Some(SpdkBdev::from_raw(ptr))
-            }
-        }
-    }
 
-    pub fn spdk_bdev_open(bdev: &SpdkBdev, write: bool, bdev_desc: &mut SpdkBdevDesc) -> Result<i32, String> {
-        unsafe {
-            let rc = raw::spdk_bdev_open(bdev.to_raw(), write, None, ptr::null_mut(), bdev_desc.mut_to_raw());
-            match rc != 0 {
-                true => {
-                    let s = format!("Could not open bdev: {}", bdev.name());
-                    Err(s)
-                }
-                false => {
-                    Ok(0)
-                }
-            }
-        }
-    }
 
-    pub fn spdk_bdev_get_by_name(bdev_name: &str) -> Result<SpdkBdev, String> {
-        unsafe {
-            let c_str = CString::new(bdev_name).unwrap();
-            let c_str_ptr = c_str.as_ptr();
-            let ptr = raw::spdk_bdev_get_by_name(c_str_ptr);
-            if ptr.is_null() {
-                Result::Err(format!("Could not find the bdev: {}", bdev_name))
-            } else {
-                Ok(SpdkBdev::from_raw(ptr))
-            }
-        }
-    }
+
+
+
 
 //    pub async fn spdk_bdev_write(desc: SpdkBdevDesc,
 //                                 ch: SpdkIoChannel,
@@ -142,7 +162,7 @@ impl SpdkBdev {
 
     pub async fn spdk_bdev_write(desc: SpdkBdevDesc,
                                  ch: SpdkIoChannel,
-                                 buf: Buf,
+                                 buf: env::Buf,
                                  offset: u64,
                                  nbytes: u64) -> Result<SpdkBdevIO, Error> {
         let (sender, receiver) = oneshot::channel();
@@ -221,6 +241,12 @@ pub struct SpdkBdevDesc {
 }
 
 impl SpdkBdevDesc {
+    pub fn new() -> SpdkBdevDesc {
+        SpdkBdevDesc {
+            raw: ptr::null_mut(),
+        }
+    }
+
     pub fn from_raw(raw: *mut raw::spdk_bdev_desc) -> SpdkBdevDesc {
         unsafe {
             SpdkBdevDesc {

@@ -86,7 +86,7 @@ impl SpdkAppOpts {
     }
 }
 
-pub fn spdk_app_stop(success: bool) {
+pub fn app_stop(success: bool) {
     unsafe {
         raw::spdk_app_stop(if success { 0 } else { -1 });
     };

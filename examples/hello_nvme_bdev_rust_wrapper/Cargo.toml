@@ -5,5 +5,7 @@ authors = ["xxks-kkk <ferrishu3886@gmail.com>"]
 
 [dependencies]
 spdk-rs = { path="../../spdk-rs"}
-futures-preview = "0.3.0-alpha.9"
+futures-preview = "0.3.0-alpha.7"
 tokio-core = "0.1.17"
+failure = ""
+failure_derive = ""
