@@ -44,6 +44,9 @@ pub enum BdevError {
 
     #[fail(display = "Could not open device: {}", _0)]
     OpenError(String),
+
+    #[fail(display = "Could not create bdev I/O channel!")]
+    IOChannelError(),
 }
 
 pub struct SpdkBdev {
@@ -83,9 +86,9 @@ pub fn open(bdev: &SpdkBdev, write: bool, bdev_desc: &mut SpdkBdevDesc) -> Resul
 }
 
 /// spdk_bdev_close()
-pub fn close(bdev_desc: SpdkBdevDesc) {
+pub fn close(desc: SpdkBdevDesc) {
     unsafe {
-        raw::spdk_bdev_close(bdev_desc.to_raw())
+        raw::spdk_bdev_close(desc.to_raw())
     }
 }
 
@@ -109,6 +112,17 @@ pub fn next(prev: &SpdkBdev) -> Option<SpdkBdev> {
             None
         } else {
             Some(SpdkBdev::from_raw(ptr))
+        }
+    }
+}
+
+pub fn get_io_channel(desc: SpdkBdevDesc) -> Result<SpdkIoChannel, Error> {
+    unsafe {
+        let ptr = raw::spdk_bdev_get_io_channel(desc.to_raw());
+        if ptr.is_null() {
+            Err(BdevError::IOChannelError())?
+        } else {
+            Ok(SpdkIoChannel::from_raw(ptr))
         }
     }
 }
@@ -240,6 +254,7 @@ impl SpdkBdev {
     }
 }
 
+#[derive(Clone)]
 pub struct SpdkBdevDesc {
     raw: *mut raw::spdk_bdev_desc,
 }

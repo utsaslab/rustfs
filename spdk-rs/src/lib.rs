@@ -17,9 +17,9 @@ extern crate hamcrest2;
 
 pub mod event;
 pub mod bdev;
-mod context;
+pub mod context;
 pub mod env;
-mod bdev_module;
+pub mod bdev_module;
 pub mod executor;
 pub mod io_channel;
 
