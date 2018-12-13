@@ -6,8 +6,6 @@ edition = "2018"
 
 [dependencies]
 spdk-rs = { path="../../spdk-rs"}
-#futures-preview = "0.3.0-alpha.7"
-#tokio-core = "0.1.17"
 failure = ""
 failure_derive = ""
 tokio = { version = "0.1.13", features = ["async-await-preview"]}

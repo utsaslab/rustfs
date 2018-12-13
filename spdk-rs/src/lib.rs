@@ -14,15 +14,17 @@ extern crate libc;
 #[cfg(test)]
 #[macro_use]
 extern crate hamcrest2;
+extern crate futures;
+#[macro_use]
+extern crate tokio;
 
 pub mod event;
 pub mod bdev;
 pub mod context;
 pub mod env;
 pub mod bdev_module;
-pub mod executor;
-pub mod io_channel;
 pub mod thread;
+pub mod run;
 
 pub use event::{SpdkAppOpts, app_stop};
 pub use bdev::{SpdkBdev, SpdkBdevDesc, SpdkIoChannel};

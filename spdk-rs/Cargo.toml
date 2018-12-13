@@ -8,6 +8,7 @@ edition = '2018'
 libspdk-sys = { path = "libspdk-sys" }
 failure = "0.1.2"
 libc = "0.2.43"
-futures-preview = "= 0.3.0-alpha.7"
-tokio = "0.1.13"
 hamcrest2 = "0.2.3"
+tokio = { version = "0.1.13", features = ["async-await-preview"]}
+futures = "0.1.25"
+tokio-async-await = "0.1.4"
