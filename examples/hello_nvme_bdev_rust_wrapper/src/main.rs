@@ -82,6 +82,8 @@ async fn run_inner() -> Result<(), Error> {
     let blk_size = spdk_rs::bdev::spdk_bdev_get_block_size(bdev);
     println!("blk_size: {}", blk_size);
 
+
+
     spdk_rs::bdev::close(desc);
     spdk_rs::thread::free_thread();
     Ok(())

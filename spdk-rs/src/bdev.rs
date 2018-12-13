@@ -23,9 +23,9 @@ use std::ptr;
 
 use failure::Error;
 
-use futures::sync::oneshot::Sender;
-use futures::sync::oneshot;
-use futures::sync::mpsc;
+use futures_new::channel::oneshot::Sender;
+use futures_new::channel::oneshot;
+use futures_new::channel::mpsc;
 
 #[derive(Debug, Fail)]
 pub enum BdevError {
