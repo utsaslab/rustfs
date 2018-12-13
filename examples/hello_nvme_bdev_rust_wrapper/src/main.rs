@@ -57,7 +57,6 @@ where F: StdFuture<Output = ()> + Send + 'static,
     let mut rt = Runtime::new().unwrap();
     rt.block_on(future);
     rt.shutdown_now().wait().unwrap();
-    println!("here");
     spdk_rs::event::app_stop(true);
 }
 
@@ -66,6 +65,8 @@ async fn run() {
             Ok(_) => println!("Successful"),
             Err(err) => println!("Failure: {:?}", err),
     }
+    // FIXME: it's very strange that we must call app_stop twice (here and in `run_spdk`)
+    // to stop the SPDK framework
     spdk_rs::event::app_stop(true);
 }
 
@@ -117,7 +118,8 @@ fn main()
     opts.config_file(config_file.to_str().unwrap());
 
     let ret = opts.start(|| {
-//        tokio::run_async(run());
+        //NOTE: Alternatively, we can use `tokio::run_async(run())` but doing so requires us to use
+        // C-c to terminate program
         run_spdk(run());
     });
     println!("Successfully shutdown SPDK framework");
