@@ -12,3 +12,4 @@ failure = ""
 failure_derive = ""
 tokio = { version = "0.1.13", features = ["async-await-preview"]}
 futures = "0.1.25"
+tokio-async-await = "0.1.4"

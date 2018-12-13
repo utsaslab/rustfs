@@ -49,6 +49,7 @@ pub enum BdevError {
     IOChannelError(),
 }
 
+#[derive(Clone)]
 pub struct SpdkBdev {
     raw: *mut raw::spdk_bdev,
 }
@@ -71,7 +72,7 @@ where
 }
 
 /// spdk_bdev_open()
-pub fn open(bdev: &SpdkBdev, write: bool, bdev_desc: &mut SpdkBdevDesc) -> Result<(), Error> {
+pub fn open(bdev: SpdkBdev, write: bool, bdev_desc: &mut SpdkBdevDesc) -> Result<(), Error> {
     unsafe {
         let rc = raw::spdk_bdev_open(bdev.to_raw(), write, None, ptr::null_mut(), bdev_desc.mut_to_raw());
         match rc != 0 {
@@ -124,6 +125,12 @@ pub fn get_io_channel(desc: SpdkBdevDesc) -> Result<SpdkIoChannel, Error> {
         } else {
             Ok(SpdkIoChannel::from_raw(ptr))
         }
+    }
+}
+
+pub fn spdk_bdev_get_block_size(bdev: SpdkBdev) -> u32 {
+    unsafe {
+        raw::spdk_bdev_get_block_size(bdev.to_raw())
     }
 }
 
@@ -233,11 +240,7 @@ impl SpdkBdev {
 //        };
 //    }
 
-    pub fn spdk_bdev_get_block_size(bdev: SpdkBdev) -> u32 {
-        unsafe {
-            raw::spdk_bdev_get_block_size(bdev.to_raw())
-        }
-    }
+
 
     pub fn name(&self) -> &str {
         let str_slice: &str;
