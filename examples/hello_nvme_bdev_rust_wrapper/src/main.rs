@@ -39,6 +39,10 @@ use std::env;
 //use futures::FutureExt;
 //use tokio_core::reactor::Core;
 
+async fn hello_world() {
+    println!("Hello World!");
+}
+
 async fn run() {
     match await!(run_inner()) {
             Ok(_) => println!("Successful"),
@@ -82,7 +86,7 @@ async fn run_inner() -> Result<(), Error> {
     let blk_size = spdk_rs::bdev::spdk_bdev_get_block_size(bdev);
     println!("blk_size: {}", blk_size);
 
-
+    await!(hello_world());
 
     spdk_rs::bdev::close(desc);
     spdk_rs::thread::free_thread();
@@ -101,7 +105,8 @@ fn main()
     let ret = opts.start(|| {
         //NOTE: Alternatively, we can use `tokio::run_async(run())` but doing so requires us to use
         // C-c to terminate program
-        spdk_rs::run::run_spdk(run());
+        //spdk_rs::run::run_spdk(run());
+        tokio::run_async(run());
     });
     println!("Successfully shutdown SPDK framework");
 }
