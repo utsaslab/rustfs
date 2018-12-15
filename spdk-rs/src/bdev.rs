@@ -127,9 +127,17 @@ pub fn get_io_channel(desc: SpdkBdevDesc) -> Result<SpdkIoChannel, Error> {
     }
 }
 
-pub fn spdk_bdev_get_block_size(bdev: SpdkBdev) -> u32 {
+/// spdk_bdev_get_block_size()
+pub fn get_block_size(bdev: SpdkBdev) -> u32 {
     unsafe {
         raw::spdk_bdev_get_block_size(bdev.to_raw())
+    }
+}
+
+/// spdk_bdev_get_buf_align()
+pub fn get_buf_align(bdev: SpdkBdev) -> usize {
+    unsafe {
+        raw::spdk_bdev_get_buf_align(bdev.to_raw())
     }
 }
 

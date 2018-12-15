@@ -85,9 +85,14 @@ async fn run_inner() -> Result<(), Error> {
         _ => {}
     }
 
-    let blk_size = spdk_rs::bdev::spdk_bdev_get_block_size(bdev);
+    let blk_size = spdk_rs::bdev::get_block_size(bdev.clone());
     println!("blk_size: {}", blk_size);
 
+    let buf_align = spdk_rs::bdev::get_buf_align(bdev.clone());
+    println!("buf_align: {}", buf_align);
+
+    let buf = spdk_rs::env::dma_zmalloc(blk_size as usize, buf_align);
+    
     await!(hello_world());
     
     spdk_rs::bdev::close(desc);
@@ -105,14 +110,11 @@ fn main()
     opts.config_file(config_file.to_str().unwrap());
 
     let ret = opts.start(|| {
-//        spdk_rs::run::run_spdk(run());
-        //tokio::run_async(run());
         let executor = spdk_rs::executor::initialize();
         mem::forget(executor);
 
         let poller = spdk_rs::io_channel::poller_register(spdk_rs::executor::pure_poll);
         spdk_rs::executor::spawn(run(poller));
-
     });
     println!("Successfully shutdown SPDK framework");
 }

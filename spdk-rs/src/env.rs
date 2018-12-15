@@ -27,7 +27,8 @@ impl Buf {
     }
 }
 
-pub fn spdk_dma_zmalloc(size: usize, align: usize) -> Buf {
+/// spdk_dma_zmalloc()
+pub fn dma_zmalloc(size: usize, align: usize) -> Buf {
     let ptr;
     unsafe {
         ptr = raw::spdk_dma_zmalloc(size, align, ptr::null_mut());
