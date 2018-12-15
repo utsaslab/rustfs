@@ -91,9 +91,12 @@ async fn run_inner() -> Result<(), Error> {
     let buf_align = spdk_rs::bdev::get_buf_align(bdev.clone());
     println!("buf_align: {}", buf_align);
 
-    let buf = spdk_rs::env::dma_zmalloc(blk_size as usize, buf_align);
-    
-    await!(hello_world());
+    let mut buf = spdk_rs::env::dma_zmalloc(blk_size as usize, buf_align);
+
+    buf.fill(blk_size as usize, "%s\n", "Hello world!");
+
+    await!(spdk_rs::bdev::write(desc.clone(), io_channel.unwrap(), buf, 0, blk_size as u64));
+    getLine!();
     
     spdk_rs::bdev::close(desc);
     spdk_rs::event::app_stop(true);

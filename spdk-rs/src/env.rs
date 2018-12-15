@@ -10,6 +10,7 @@
 
 use crate::raw;
 use std::ffi::{CString, CStr, c_void};
+use std::os::raw::{c_char, c_int};
 use std::ptr;
 
 pub struct Buf {
@@ -20,11 +21,24 @@ impl Buf {
     pub fn to_raw(&self) -> *mut c_void {
         self.raw
     }
+    
     pub fn from_raw(raw: *mut c_void) -> Buf {
         Buf {
             raw: raw,
         }
     }
+
+    /// Fill in the buffer with given content using given fmt
+    pub fn fill<S>(&mut self, size: usize, fmt: S, content: S)
+    where
+        S: Into<String> + Clone,
+    {
+        let owned_fmt = CString::new(fmt.clone().into()).expect("Couldn't create a string");
+        let fmt: *const c_char = owned_fmt.as_ptr();
+        let owned_content = CString::new(content.clone().into()).expect("Couldn't create a string");
+        let content: *const c_char = owned_content.as_ptr();
+        unsafe { raw::snprintf(self.to_raw() as *mut i8, size, fmt, content); }
+    }   
 }
 
 /// spdk_dma_zmalloc()
