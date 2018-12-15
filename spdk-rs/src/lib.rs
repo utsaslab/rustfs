@@ -26,6 +26,8 @@ pub mod env;
 pub mod bdev_module;
 pub mod thread;
 pub mod run;
+pub mod executor;
+pub mod io_channel;
 
 pub use event::{SpdkAppOpts, app_stop};
 pub use bdev::{SpdkBdev, SpdkBdevDesc, SpdkIoChannel};

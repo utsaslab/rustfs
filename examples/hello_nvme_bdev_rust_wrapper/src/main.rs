@@ -32,28 +32,36 @@ use std::env;
 //use std::ptr;
 //use std::rc::Rc;
 //use std::cell::RefCell;
-//use std::mem;
+use std::mem;
 //
 //use futures::future::Future;
 //use futures::executor::block_on;
 //use futures::FutureExt;
 //use tokio_core::reactor::Core;
 
+#[macro_export]
+macro_rules! getLine {
+ ($($msg : expr)*) => {
+    println!("[DEBUG] Execution hit line: {}", line!());
+ }
+}
+
 async fn hello_world() {
     println!("Hello World!");
 }
 
-async fn run() {
+async fn run(poller: spdk_rs::io_channel::PollerHandle) {
     match await!(run_inner()) {
             Ok(_) => println!("Successful"),
             Err(err) => println!("Failure: {:?}", err),
     }
-    // FIXME: it's very strange that we must call app_stop twice (here and in `run_spdk`)
-    // to stop the SPDK framework
+    // FIXME: drop poller can lead to seg fault
+    //drop(poller);
     spdk_rs::event::app_stop(true);
 }
 
 async fn run_inner() -> Result<(), Error> {
+
     let mut first_bdev = spdk_rs::bdev::first();
     while !first_bdev.is_none() {
         let bdev = first_bdev.unwrap();
@@ -71,12 +79,6 @@ async fn run_inner() -> Result<(), Error> {
         _ => {}
     }
 
-    let ret = spdk_rs::thread::allocate_thread("new_thread");
-    match ret {
-        Ok(_) => println!("Successfully allocate a thread"),
-        _ => {}
-    }
-
     let mut io_channel = spdk_rs::bdev::get_io_channel(desc.clone());
     match ret {
         Ok(_) => println!("Successfully create a bdev I/O channel"),
@@ -87,9 +89,9 @@ async fn run_inner() -> Result<(), Error> {
     println!("blk_size: {}", blk_size);
 
     await!(hello_world());
-
+    
     spdk_rs::bdev::close(desc);
-    spdk_rs::thread::free_thread();
+    spdk_rs::event::app_stop(true);
     Ok(())
 }
 
@@ -103,10 +105,14 @@ fn main()
     opts.config_file(config_file.to_str().unwrap());
 
     let ret = opts.start(|| {
-        //NOTE: Alternatively, we can use `tokio::run_async(run())` but doing so requires us to use
-        // C-c to terminate program
-        //spdk_rs::run::run_spdk(run());
-        tokio::run_async(run());
+//        spdk_rs::run::run_spdk(run());
+        //tokio::run_async(run());
+        let executor = spdk_rs::executor::initialize();
+        mem::forget(executor);
+
+        let poller = spdk_rs::io_channel::poller_register(spdk_rs::executor::pure_poll);
+        spdk_rs::executor::spawn(run(poller));
+
     });
     println!("Successfully shutdown SPDK framework");
 }
