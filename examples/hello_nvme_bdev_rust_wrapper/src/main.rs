@@ -27,7 +27,6 @@ extern crate tokio_async_await;
 use std::path::Path;
 use failure::Error;
 use std::env;
-use std::ffi::CStr;
 use std::mem;
 
 #[macro_export]
@@ -56,7 +55,7 @@ async fn run_inner() -> Result<(), Error> {
         first_bdev = spdk_rs::bdev::next(&bdev);
     }
 
-    let mut ret = spdk_rs::bdev::get_by_name("Malloc0");
+    let ret = spdk_rs::bdev::get_by_name("Malloc0");
     let bdev = ret.unwrap();
     let mut desc = spdk_rs::bdev::SpdkBdevDesc::new();
 
@@ -109,7 +108,7 @@ fn main()
     opts.name("hello_bdev");
     opts.config_file(config_file.to_str().unwrap());
 
-    let ret = opts.start(|| {
+    let _ret = opts.start(|| {
         let executor = spdk_rs::executor::initialize();
         mem::forget(executor);
 
