@@ -20,6 +20,25 @@ pub enum ThreadError {
     ThreadAllocationError(),
 }
 
+#[derive(Clone)]
+pub struct SpdkIoChannel {
+    raw: *mut raw::spdk_io_channel,
+}
+
+impl SpdkIoChannel {
+    pub fn from_raw(raw: *mut raw::spdk_io_channel) -> SpdkIoChannel {
+        unsafe {
+            SpdkIoChannel {
+                raw: raw,
+            }
+        }
+    }
+
+    pub fn to_raw(&self) -> *mut raw::spdk_io_channel {
+        self.raw
+    }
+}
+
 pub struct SpdkThread {
     raw: *mut raw::spdk_thread,
 }
@@ -56,5 +75,11 @@ where S: Into<String> + Clone,
 pub fn free_thread() {
     unsafe {
         raw::spdk_free_thread();
+    }
+}
+
+pub fn put_io_channel(channel: SpdkIoChannel) {
+    unsafe {
+        raw::spdk_put_io_channel(channel.to_raw())
     }
 }

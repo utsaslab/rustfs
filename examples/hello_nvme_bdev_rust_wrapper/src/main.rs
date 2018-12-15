@@ -27,27 +27,14 @@ extern crate tokio_async_await;
 use std::path::Path;
 use failure::Error;
 use std::env;
-
-//use std::ffi::c_void;
-//use std::ptr;
-//use std::rc::Rc;
-//use std::cell::RefCell;
+use std::ffi::CStr;
 use std::mem;
-//
-//use futures::future::Future;
-//use futures::executor::block_on;
-//use futures::FutureExt;
-//use tokio_core::reactor::Core;
 
 #[macro_export]
 macro_rules! getLine {
  ($($msg : expr)*) => {
     println!("[DEBUG] Execution hit line: {}", line!());
  }
-}
-
-async fn hello_world() {
-    println!("Hello World!");
 }
 
 async fn run(poller: spdk_rs::io_channel::PollerHandle) {
@@ -73,17 +60,12 @@ async fn run_inner() -> Result<(), Error> {
     let bdev = ret.unwrap();
     let mut desc = spdk_rs::bdev::SpdkBdevDesc::new();
 
-    let ret = spdk_rs::bdev::open(bdev.clone(), true, &mut desc);
-    match ret {
+    match spdk_rs::bdev::open(bdev.clone(), true, &mut desc) {
         Ok(_) => println!("Successfully open the device"),
         _ => {}
     }
 
-    let mut io_channel = spdk_rs::bdev::get_io_channel(desc.clone());
-    match ret {
-        Ok(_) => println!("Successfully create a bdev I/O channel"),
-        _ => {}
-    }
+    let io_channel = spdk_rs::bdev::get_io_channel(desc.clone())?;
 
     let blk_size = spdk_rs::bdev::get_block_size(bdev.clone());
     println!("blk_size: {}", blk_size);
@@ -91,13 +73,28 @@ async fn run_inner() -> Result<(), Error> {
     let buf_align = spdk_rs::bdev::get_buf_align(bdev.clone());
     println!("buf_align: {}", buf_align);
 
-    let mut buf = spdk_rs::env::dma_zmalloc(blk_size as usize, buf_align);
+    let mut write_buf = spdk_rs::env::dma_zmalloc(blk_size as usize, buf_align);
 
-    buf.fill(blk_size as usize, "%s\n", "Hello world!");
+    write_buf.fill(blk_size as usize, "%s\n", "Hello world!");
 
-    await!(spdk_rs::bdev::write(desc.clone(), io_channel.unwrap(), buf, 0, blk_size as u64));
-    getLine!();
+    match await!(spdk_rs::bdev::write(desc.clone(), &io_channel, &write_buf, 0, blk_size as u64)) {
+        Ok(_) => println!("Successfully write to bdev"),
+        _ => {}
+    }
+
+    let mut read_buf = spdk_rs::env::dma_zmalloc(blk_size as usize, buf_align);
     
+    match await!(spdk_rs::bdev::read(desc.clone(), &io_channel, &mut read_buf, 0, blk_size as u64)) {
+        Ok(_) => println!("Successfully read from bdev"),
+        _ => {}
+    }
+
+    println!("Read string from bdev: {}", read_buf.read());
+
+    drop(read_buf);
+    drop(write_buf);
+
+    spdk_rs::thread::put_io_channel(io_channel);
     spdk_rs::bdev::close(desc);
     spdk_rs::event::app_stop(true);
     Ok(())

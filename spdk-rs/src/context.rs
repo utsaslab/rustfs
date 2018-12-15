@@ -15,9 +15,9 @@ use crate::raw;
 use crate::SpdkBdev;
 use crate::SpdkBdevDesc;
 use crate::SpdkBdevIO;
-use crate::SpdkIoChannel;
 use crate::Buf;
 use crate::bdev;
+use crate::thread;
 
 use std::ffi::{CString, CStr};
 use std::os::raw::{c_void, c_char, c_int};
@@ -197,8 +197,8 @@ impl AppContext {
         }
     }
 
-    pub fn bdev_io_channel(&self) -> SpdkIoChannel {
-        SpdkIoChannel::from_raw(self.bdev_io_channel)
+    pub fn bdev_io_channel(&self) -> thread::SpdkIoChannel {
+        thread::SpdkIoChannel::from_raw(self.bdev_io_channel)
     }
 
     pub fn buff(&self) -> Buf {

@@ -30,7 +30,7 @@ pub mod executor;
 pub mod io_channel;
 
 pub use event::{SpdkAppOpts, app_stop};
-pub use bdev::{SpdkBdev, SpdkBdevDesc, SpdkIoChannel};
+pub use bdev::{SpdkBdev, SpdkBdevDesc};
 pub use context::{AppContext, SpdkBdevIoCompletionCb};
 pub use env::{Buf};
 pub use bdev_module::{SpdkBdevIO};

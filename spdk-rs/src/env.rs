@@ -13,6 +13,7 @@ use std::ffi::{CString, CStr, c_void};
 use std::os::raw::{c_char, c_int};
 use std::ptr;
 
+#[derive(Clone)]
 pub struct Buf {
     raw : *mut c_void
 }
@@ -38,7 +39,13 @@ impl Buf {
         let owned_content = CString::new(content.clone().into()).expect("Couldn't create a string");
         let content: *const c_char = owned_content.as_ptr();
         unsafe { raw::snprintf(self.to_raw() as *mut i8, size, fmt, content); }
-    }   
+    }
+
+    pub fn read(&self) -> &'static str {
+        unsafe{
+            CStr::from_ptr(self.to_raw() as *const i8).to_str().unwrap()            
+        }
+    }
 }
 
 /// spdk_dma_zmalloc()
