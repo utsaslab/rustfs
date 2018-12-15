@@ -4,7 +4,6 @@ RustFS will be written in Rust, taking advantage of the high-level features offe
 
 ## Committers
 1. [Zeyuan Hu (xxks-kkk)](http://github.com/xxks-kkk)
-2. [Daniel Moore (danielpygo)](https://github.com/danielpygo)
 3. [Vijay Chidambaram (vijay03)](https://github.com/vijay03)
 
 ## Get Involvement

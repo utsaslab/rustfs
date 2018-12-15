@@ -1,7 +1,13 @@
 [package]
-name = "hello_nvme_bdev_rust_wrapper2"
+name = "hello_nvme_bdev_rust_wrapper"
 version = "0.1.0"
 authors = ["xxks-kkk <ferrishu3886@gmail.com>"]
+edition = "2018"
 
 [dependencies]
 spdk-rs = { path="../../spdk-rs"}
+failure = ""
+failure_derive = ""
+tokio = { version = "0.1.13", features = ["async-await-preview"]}
+futures = "0.1.25"
+tokio-async-await = "0.1.4"

@@ -29,6 +29,7 @@ fn main() {
     // the resulting bindings.
     let bindings = bindgen::Builder::default()
         .clang_arg(include_path_spdk_dir)
+        .derive_default(true)
         // The input header we would like to generate
         // bindings for.
         .header("src/wrapper.h")

@@ -206,7 +206,8 @@ fn main() {
         let owned_config_file = CString::new("bdev.conf").unwrap();
         opts.config_file = owned_config_file.as_ptr();
 
-        let owned_bdev_name = CString::new("Nvme0n1").unwrap();
+        //let owned_bdev_name = CString::new("Nvme0n1").unwrap();
+        let owned_bdev_name = CString::new("Malloc0").unwrap();
         hello_context.bdev_name = owned_bdev_name.as_ptr();
 
         let hello_context_ptr: *mut c_void = &mut hello_context as *mut _ as *mut c_void;
