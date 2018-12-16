@@ -7,3 +7,9 @@
     
     Main driver program to run various benchmarks
  ************************************************************************/
+
+pub mod language;
+
+fn main() {
+    language::main();
+}
