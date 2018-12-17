@@ -15,6 +15,8 @@ use std::io::prelude::*;
 use std::path::{Path, PathBuf};
 use std::io::{BufRead, BufReader, Result};
 use std::collections::HashMap;
+use std::fs;
+use toml::Value;
 
 macro_rules! build_from_paths {
     ($base:expr, $($segment:expr),+) => {{
@@ -30,16 +32,17 @@ fn usage() {
 
 }
 
-/// Use `dd` to benchmark
-fn test_dd(dict: &HashMap<String, String>) {
+/// Use `dd` to benchmark the throughput and latency for sequential write
+fn dd_seq(dict: &HashMap<String, String>) {
     let of_path = build_from_paths!(dict.get("SSD_PATH").unwrap(), "testfile");
-    println!("of_path: {}", of_path.display());
+    let bs = dict.get("BS").unwrap();
+    let count = dict.get("COUNT").unwrap();
 
     let output = process::Command::new("dd")
         .arg("if=/dev/zero")
         .arg(["of=", of_path.to_str().unwrap()].join(""))
-        .arg("bs=1G")
-        .arg("count=1")
+        .arg(["bs=", bs].join(""))
+        .arg(["count=", count].join(""))
         .arg("oflag=direct")
         .output()
         .expect("failed to execute process");
@@ -55,7 +58,7 @@ fn test_dd(dict: &HashMap<String, String>) {
     // e.g., 723
     let throughput = v2_string[1];
 
-    println!("Throughput {:} MB/s", v2_string[1]);
+    println!("Throughput: {:} MB/s", v2_string[1]);
     assert!(output.status.success());
 }
 
@@ -76,20 +79,13 @@ fn parse_config() -> Result<HashMap<String,String>> {
         Ok(file) => file
     };
 
-    for line in BufReader::new(file).lines() {
-        let line_content = line.unwrap();
-        if !line_content.starts_with("#") {
-            //println!("{}", line_content);
-            let v: Vec<&str> = line_content.split("=").collect();
-            if v[0] == "SSD_PATH" {
-                dict.insert(v[0].to_string(), v[1].to_string());
-            }
-        }
-    }
+    let contents = fs::read_to_string(filename)
+        .expect("Something went wrong reading the file");
+    println!("{:}", contents);
     Ok(dict)
 }
 
 pub fn main() {
     let dict = parse_config().unwrap();
-    test_dd(&dict);
+    dd_seq(&dict);
 }

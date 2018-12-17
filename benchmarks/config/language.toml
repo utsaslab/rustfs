@@ -1,0 +1,21 @@
+[common]
+# Mount point of SSD
+SSD_PATH = "/mnt/ssd/zeyuan"
+# Block device
+DEVICE = "/dev/nvme0n1"
+
+# Setup to measure the throughput
+[sequential_write]
+# Block size (this number will be fed to dd; make sure this number is correct.
+# One way to make sure is to
+# `dd if=/dev/zero of=/mnt/ssd/zeyuan/testfile bs=512 count=4000000 oflag=direct`
+# and then monitor the device `iostat -p /dev/nvme0n1 1`. If the number is correct,
+# "kB_read/s" should be 0 (i.e., there should be no read) because we only issue write.
+BS = "1G"
+# dd's `count=`
+COUNT = 10000
+# dd's `dsync`
+oflag = "dsync"
+
+# Setup to measure the latency
+[random_write]
