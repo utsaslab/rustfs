@@ -12,8 +12,8 @@ DEVICE = "/dev/nvme0n1"
 # and then monitor the device `iostat -p /dev/nvme0n1 1`. If the number is correct,
 # "kB_read/s" should be 0 (i.e., there should be no read) because we only issue write.
 BS = "1G"
-# dd's `count=`
-COUNT = 10000
+# dd's `count=` (e.g. 120)
+COUNT = 1
 # dd's `dsync`
 oflag = "dsync"
 

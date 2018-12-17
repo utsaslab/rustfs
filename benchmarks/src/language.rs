@@ -18,32 +18,40 @@ use std::collections::HashMap;
 use std::fs;
 use toml::Value;
 
-macro_rules! build_from_paths {
-    ($base:expr, $($segment:expr),+) => {{
-        let mut base: ::std::path::PathBuf = $base.into();
-        $(
-            base.push($segment);
-        )*
-        base
-    }}
-}
-
 fn usage() {
 
 }
 
-/// Use `dd` to benchmark the throughput and latency for sequential write
-fn dd_seq(dict: &HashMap<String, String>) {
-    let of_path = build_from_paths!(dict.get("SSD_PATH").unwrap(), "testfile");
-    let bs = dict.get("BS").unwrap();
-    let count = dict.get("COUNT").unwrap();
+/// strip surround quotes for the given string
+fn strip(s: String) -> String {
+    let mut t = s.clone();
+    t.remove(0);
+    t.remove(t.len()-1);
+    t
+}
+
+/// Use `dd` to benchmark the throughput for sequential write
+fn dd_seq(dict: &toml::Value) {
+    let mut of_path = strip(dict["common"]["SSD_PATH"].to_string());
+    let of_path = [of_path, String::from("testfile")].join("/");
+    let mut bs = strip(dict["sequential_write"]["BS"].to_string());
+    let count = dict["sequential_write"]["COUNT"].to_string();
+    let oflag = strip(dict["sequential_write"]["oflag"].to_string());
+
+    let mut command = "dd ".to_owned();
+    command = command + "if=/dev/zero" + " " +
+        "of=" + of_path.as_str() + " " +
+        "bs=" + bs.as_str() + " " +
+        "count=" + count.as_str() + " " +
+        "oflag=" + oflag.as_str() + " ";
+    println!("Command: {}", command);
 
     let output = process::Command::new("dd")
         .arg("if=/dev/zero")
-        .arg(["of=", of_path.to_str().unwrap()].join(""))
-        .arg(["bs=", bs].join(""))
-        .arg(["count=", count].join(""))
-        .arg("oflag=direct")
+        .arg(["of=", of_path.as_str()].join(""))
+        .arg(["bs=", bs.as_str()].join(""))
+        .arg(["count=", count.as_str()].join(""))
+        .arg(["oflag=", oflag.as_str()].join(""))
         .output()
         .expect("failed to execute process");
 
@@ -62,30 +70,24 @@ fn dd_seq(dict: &HashMap<String, String>) {
     assert!(output.status.success());
 }
 
-/// Use native Rust to benchmark
-fn test_rust() {
-
+/// Use the SPDK framework to perform sequential write
+/// and calculate the throughput
+fn rust_seq(dict: &toml::Value) {
+    
 }
 
 // parse the configuration file
-fn parse_config() -> Result<HashMap<String,String>> {
-    let mut dict = HashMap::new();
-
-    let path = Path::new("config/language.conf");
-    let display = path.display();
-
-    let file = match File::open(&path) {
-        Err(why) => panic!("Couldn't open {}: {}", display, why.description()),
-        Ok(file) => file
-    };
-
-    let contents = fs::read_to_string(filename)
+fn parse_config() -> Result<toml::Value> {
+    let contents = fs::read_to_string("config/language.toml")
         .expect("Something went wrong reading the file");
-    println!("{:}", contents);
-    Ok(dict)
+
+    let value = contents.parse::<Value>().unwrap();
+
+    Ok(value)
 }
 
 pub fn main() {
     let dict = parse_config().unwrap();
     dd_seq(&dict);
+    rust_seq(&dict);
 }
