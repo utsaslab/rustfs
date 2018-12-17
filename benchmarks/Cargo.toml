@@ -6,3 +6,6 @@ edition = "2018"
 
 [dependencies]
 toml = "0.4.10"
+spdk-rs = { path="../spdk-rs"}
+failure = ""
+failure_derive = ""
