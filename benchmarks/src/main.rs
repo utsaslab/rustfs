@@ -7,6 +7,11 @@
     
     Main driver program to run various benchmarks
  ************************************************************************/
+#![feature(await_macro, async_await, futures_api, nll, generators)]
+
+extern crate failure;
+extern crate spdk_rs;
+extern crate futures;
 
 pub mod language;
 

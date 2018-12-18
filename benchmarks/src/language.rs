@@ -9,14 +9,11 @@
  ************************************************************************/
 
 use std::process;
-use std::error::Error;
-use std::fs::File;
-use std::io::prelude::*;
-use std::path::{Path, PathBuf};
-use std::io::{BufRead, BufReader, Result};
-use std::collections::HashMap;
+use std::path::Path;
 use std::fs;
 use toml::Value;
+use std::mem;
+use failure::Error;
 
 fn usage() {
 
@@ -70,14 +67,77 @@ fn dd_seq(dict: &toml::Value) {
     assert!(output.status.success());
 }
 
+async fn run(poller: spdk_rs::io_channel::PollerHandle) {
+    match await!(run_inner()) {
+        Ok(_) => println!("Successful"),
+        Err(err) => println!("Failure: {:?}", err),
+    }
+    spdk_rs::event::app_stop(true);
+}
+
+async fn run_inner() -> Result<(), Error> {
+    let ret = spdk_rs::bdev::get_by_name("Malloc0");
+    let bdev = ret.unwrap();
+    let mut desc = spdk_rs::bdev::SpdkBdevDesc::new();
+
+    match spdk_rs::bdev::open(bdev.clone(), true, &mut desc) {
+        Ok(_) => println!("Successfully open the device"),
+        _ => {}
+    };
+
+    let io_channel = spdk_rs::bdev::get_io_channel(desc.clone())?;
+
+    let blk_size = spdk_rs::bdev::get_block_size(bdev.clone());
+    println!("blk_size: {}", blk_size);
+
+    let buf_align = spdk_rs::bdev::get_buf_align(bdev.clone());
+    println!("buf_align: {}", buf_align);
+
+    let mut write_buf = spdk_rs::env::dma_zmalloc(blk_size as usize, buf_align);
+
+    write_buf.fill(blk_size as usize, "%s\n", "Hello world!");
+
+    let written_times: i32 = 10;
+
+//    match await!(for i in 0..written_times {
+//        spdk_rs::bdev::write(desc.clone(), &io_channel, &write_buf, 0, blk_size as u64);
+//    }) {
+//        Ok(_) => println!("Successfully write to bdev"),
+//        _ => {}
+//    }
+    match await!(spdk_rs::bdev::write(desc.clone(), &io_channel, &write_buf, 0, blk_size as u64)) {
+        Ok(_) => println!("Successfully write to bdev"),
+        _ => {}
+    }
+
+    spdk_rs::thread::put_io_channel(io_channel);
+    spdk_rs::bdev::close(desc);
+    spdk_rs::event::app_stop(true);
+    Ok(())
+}
+
 /// Use the SPDK framework to perform sequential write
 /// and calculate the throughput
 fn rust_seq(dict: &toml::Value) {
-    
+    let config_file = Path::new("config/bdev.conf").canonicalize().unwrap();
+    let mut opts = spdk_rs::event::SpdkAppOpts::new();
+
+    opts.name("language");
+    opts.config_file(config_file.to_str().unwrap());
+
+    let _ret = opts.start(|| {
+        let executor = spdk_rs::executor::initialize();
+        mem::forget(executor);
+
+        let poller = spdk_rs::io_channel::poller_register(spdk_rs::executor::pure_poll);
+        spdk_rs::executor::spawn(run(poller));
+    });
+
+    println!("Successfully shutdown SPDK framework");
 }
 
 // parse the configuration file
-fn parse_config() -> Result<toml::Value> {
+fn parse_config() -> Result<toml::Value, Error> {
     let contents = fs::read_to_string("config/language.toml")
         .expect("Something went wrong reading the file");
 
@@ -88,6 +148,6 @@ fn parse_config() -> Result<toml::Value> {
 
 pub fn main() {
     let dict = parse_config().unwrap();
-    dd_seq(&dict);
+    //dd_seq(&dict);
     rust_seq(&dict);
 }
