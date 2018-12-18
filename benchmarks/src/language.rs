@@ -20,21 +20,13 @@ fn usage() {
 
 }
 
-/// strip surround quotes for the given string
-fn strip(s: String) -> String {
-    let mut t = s.clone();
-    t.remove(0);
-    t.remove(t.len()-1);
-    t
-}
-
 /// Use `dd` to benchmark the throughput for sequential write
 fn dd_seq(dict: &toml::Value) {
-    let mut of_path = strip(dict["common"]["SSD_PATH"].to_string());
+    let mut of_path = utils_rustfs::strip(dict["common"]["SSD_PATH"].to_string());
     let of_path = [of_path, String::from("testfile")].join("/");
-    let mut bs = strip(dict["sequential_write"]["BS"].to_string());
+    let mut bs = utils_rustfs::strip(dict["sequential_write"]["BS"].to_string());
     let count = dict["sequential_write"]["COUNT"].to_string();
-    let oflag = strip(dict["sequential_write"]["oflag"].to_string());
+    let oflag = utils_rustfs::strip(dict["sequential_write"]["oflag"].to_string());
 
     let mut command = "dd ".to_owned();
     command = command + "if=/dev/zero" + " " +
