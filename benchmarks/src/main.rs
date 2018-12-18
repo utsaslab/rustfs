@@ -12,6 +12,7 @@
 extern crate failure;
 extern crate spdk_rs;
 extern crate futures;
+extern crate utils_rustfs;
 
 pub mod language;
 

@@ -14,6 +14,7 @@ use std::fs;
 use toml::Value;
 use std::mem;
 use failure::Error;
+use utils_rustfs;
 
 fn usage() {
 
@@ -99,16 +100,12 @@ async fn run_inner() -> Result<(), Error> {
 
     let written_times: i32 = 10;
 
-//    match await!(for i in 0..written_times {
-//        spdk_rs::bdev::write(desc.clone(), &io_channel, &write_buf, 0, blk_size as u64);
-//    }) {
-//        Ok(_) => println!("Successfully write to bdev"),
-//        _ => {}
-//    }
-    match await!(spdk_rs::bdev::write(desc.clone(), &io_channel, &write_buf, 0, blk_size as u64)) {
-        Ok(_) => println!("Successfully write to bdev"),
-        _ => {}
-    }
+    await!( async {
+        for i in 0..written_times {
+            utils_rustfs::getLine!();
+            spdk_rs::bdev::write(desc.clone(), &io_channel, &write_buf, 0, blk_size as u64);
+        }
+    });
 
     spdk_rs::thread::put_io_channel(io_channel);
     spdk_rs::bdev::close(desc);
