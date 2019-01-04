@@ -40,6 +40,20 @@ pub enum BdevError {
     WriteError(String, i32, u64, u64),
 
     #[fail(
+    display = "Error in write zeroes blocks({}): {}",
+    _0,
+    _1
+    )]
+    WriteZeroesBlocksError(String, i32),
+
+    #[fail(
+    display = "Error in write zeroes({}): {}",
+    _0,
+    _1
+    )]
+    WriteZeroesError(String, i32),
+
+    #[fail(
     display = "Error in read completion({}): {}, offset: {}, length: {}",
     _0,
     _1,
@@ -183,6 +197,65 @@ pub async fn write<'a>(desc: SpdkBdevDesc,
       ))?,
   }
 }
+
+/// spdk_bdev_write_zeroes()
+pub async fn write_zeroes<'a>(desc: SpdkBdevDesc,
+                       ch: &'a thread::SpdkIoChannel,
+                       offset: u64,
+                       len: u64) -> Result<(), Error> {
+    let (sender, receiver) = oneshot::channel();
+    let ret: i32;
+    unsafe {
+        ret = raw::spdk_bdev_write_zeroes(
+            desc.raw,
+            ch.to_raw(),
+            offset,
+            len,
+            Some(spdk_bdev_io_completion_cb),
+            cb_arg::<()>(sender),
+        );
+    };
+    // TODO: we probably need to handle the case where ret != 0
+    let res = await!(receiver).expect("Cancellation is not supported");
+
+    match res {
+        Ok(()) => Ok(()),
+        Err(_e) => Err(BdevError::WriteZeroesError(
+            desc.spdk_bdev_desc_get_bdev().name().to_string(),
+            ret,
+        ))?,
+    }
+}
+
+/// spdk_bdev_write_zeroes_blocks()
+pub async fn write_zeroes_blocks<'a>(desc: SpdkBdevDesc,
+                       ch: &'a thread::SpdkIoChannel,
+                       offset_blocks: u64,
+                       num_blocks: u64) -> Result<(), Error> {
+    let (sender, receiver) = oneshot::channel();
+    let ret: i32;
+    unsafe {
+        ret = raw::spdk_bdev_write_zeroes_blocks(
+            desc.raw,
+            ch.to_raw(),
+            offset_blocks,
+            num_blocks,
+            Some(spdk_bdev_io_completion_cb),
+            cb_arg::<()>(sender),
+        );
+    };
+    // TODO: we probably need to handle the case where ret != 0
+    let res = await!(receiver).expect("Cancellation is not supported");
+
+    match res {
+        Ok(()) => Ok(()),
+        Err(_e) => Err(BdevError::WriteZeroesBlocksError(
+            desc.spdk_bdev_desc_get_bdev().name().to_string(),
+            ret
+        ))?,
+    }
+}
+
 
 pub async fn read<'a>(desc: SpdkBdevDesc,
                   ch: &'a thread::SpdkIoChannel,

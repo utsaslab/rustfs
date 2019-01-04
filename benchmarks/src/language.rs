@@ -86,16 +86,13 @@ async fn run_inner() -> Result<(), Error> {
     let buf_align = spdk_rs::bdev::get_buf_align(bdev.clone());
     println!("buf_align: {}", buf_align);
 
-    let mut write_buf = spdk_rs::env::dma_zmalloc(blk_size as usize, buf_align);
-
-    write_buf.fill(blk_size as usize, "%s\n", "Hello world!");
-
     let written_times: i32 = 10;
 
     await!( async {
         for i in 0..written_times {
             utils_rustfs::getLine!();
-            spdk_rs::bdev::write(desc.clone(), &io_channel, &write_buf, 0, blk_size as u64);
+            //TODO: replace with `spdk_bdev_write_zeroes_blocks()` (need to add wrapper first)
+            spdk_rs::bdev::write_zeroes(desc.clone(), &io_channel, 0, 512);
         }
     });
 
