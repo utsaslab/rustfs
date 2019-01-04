@@ -1,5 +1,5 @@
 /*************************************************************************
-  > File Name:       main.rs.rs
+  > File Name:       main.rs
   > Author:          Zeyuan Hu
   > Mail:            iamzeyuanhu@utexas.edu
   > Created Time:    12/15/18
