@@ -16,6 +16,9 @@ use std::mem;
 use failure::Error;
 use utils_rustfs;
 
+use std::env;
+use env_logger::Builder;
+
 fn usage() {
 
 }
@@ -69,6 +72,36 @@ async fn run(poller: spdk_rs::io_channel::PollerHandle) {
 }
 
 async fn run_inner() -> Result<(), Error> {
+
+    let dict = parse_config().unwrap();
+
+    let mut of_path = utils_rustfs::strip(dict["common"]["SSD_PATH"].to_string());
+    let of_path = [of_path, String::from("testfile")].join("/");
+    let mut bs = utils_rustfs::strip(dict["sequential_write"]["BS"].to_string());
+    let count = dict["sequential_write"]["COUNT"].to_string();
+    let oflag = utils_rustfs::strip(dict["sequential_write"]["oflag"].to_string());
+
+    // let's first calculate how much we should write to the device
+    let mut num = String::from("");
+    let mut unit = String::from("");
+    for c in bs.chars() {
+        if c.is_alphabetic() {
+            unit.push(c);
+        } else {
+            num.push(c);
+        }
+    }
+
+    debug!("num: {}", num);
+    debug!("unit: {}", unit);
+    debug!("count: {}", count);
+    
+    let mut num_int = num.parse::<u64>().unwrap();
+    let count_int = count.parse::<u64>().unwrap();
+    num_int = num_int * count_int;
+    let write_size = utils_rustfs::convert(num_int.to_string().as_str(), unit.as_str(), "B");
+    debug!("write_size: {}", write_size);
+    
     let ret = spdk_rs::bdev::get_by_name("Malloc0");
     let bdev = ret.unwrap();
     let mut desc = spdk_rs::bdev::SpdkBdevDesc::new();
@@ -104,7 +137,7 @@ async fn run_inner() -> Result<(), Error> {
 
 /// Use the SPDK framework to perform sequential write
 /// and calculate the throughput
-fn rust_seq(dict: &toml::Value) {
+fn rust_seq() {
     let config_file = Path::new("config/bdev.conf").canonicalize().unwrap();
     let mut opts = spdk_rs::event::SpdkAppOpts::new();
 
@@ -133,7 +166,11 @@ fn parse_config() -> Result<toml::Value, Error> {
 }
 
 pub fn main() {
+    Builder::new()
+        .parse(&env::var("RUSTFS_BENCHMARKS_LANGUAGE_LOG").unwrap_or_default())
+        .init();
+       
     let dict = parse_config().unwrap();
     //dd_seq(&dict);
-    rust_seq(&dict);
+    rust_seq();
 }

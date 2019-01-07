@@ -14,6 +14,10 @@ extern crate spdk_rs;
 extern crate futures;
 extern crate utils_rustfs;
 
+#[macro_use]
+extern crate log;
+extern crate env_logger;
+
 pub mod language;
 
 fn main() {
