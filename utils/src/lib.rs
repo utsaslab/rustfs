@@ -26,7 +26,7 @@ pub fn strip(s: String) -> String {
 /// by `unit2`. Function uses `unit1` as the base unit and perform convert.
 /// Given string should only be literal.
 /// ## Example:
-/// - convert("1", "MB", "KB") -> "1024KB"
+/// - convert("1", "MB", "KB") -> "1024"
 /// ## Supported conversion: MB, KB, G, B
 pub fn convert(s: &str, _unit1: &str, _unit2: &str) -> String {
     let res: f64;

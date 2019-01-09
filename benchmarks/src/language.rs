@@ -15,16 +15,19 @@ use toml::Value;
 use std::mem;
 use failure::Error;
 use utils_rustfs;
-
 use std::env;
 use env_logger::Builder;
+use std::time::{Duration, Instant};
 
 fn usage() {
 
 }
 
 /// Use `dd` to benchmark the throughput for sequential write
-fn dd_seq(dict: &toml::Value) {
+fn dd_seq() {
+
+    let dict = parse_config().unwrap();
+    
     let mut of_path = utils_rustfs::strip(dict["common"]["SSD_PATH"].to_string());
     let of_path = [of_path, String::from("testfile")].join("/");
     let mut bs = utils_rustfs::strip(dict["sequential_write"]["BS"].to_string());
@@ -101,13 +104,15 @@ async fn run_inner() -> Result<(), Error> {
     num_int = num_int * count_int;
     let write_size = utils_rustfs::convert(num_int.to_string().as_str(), unit.as_str(), "B");
     debug!("write_size: {}", write_size);
+    let write_size_numeric: u64 = write_size.parse::<u64>().unwrap();
     
-    let ret = spdk_rs::bdev::get_by_name("Malloc0");
+    //let ret = spdk_rs::bdev::get_by_name("Malloc0");
+    let ret = spdk_rs::bdev::get_by_name("Nvme0n1");    
     let bdev = ret.unwrap();
     let mut desc = spdk_rs::bdev::SpdkBdevDesc::new();
 
     match spdk_rs::bdev::open(bdev.clone(), true, &mut desc) {
-        Ok(_) => println!("Successfully open the device"),
+        Ok(_) => println!("Successfully open the device {}", bdev.name()),
         _ => {}
     };
 
@@ -119,16 +124,21 @@ async fn run_inner() -> Result<(), Error> {
     let buf_align = spdk_rs::bdev::get_buf_align(bdev.clone());
     println!("buf_align: {}", buf_align);
 
-    let written_times: i32 = 10;
-
+    // let's time the execution of the write
+    let start = Instant::now();
     await!( async {
-        for i in 0..written_times {
-            utils_rustfs::getLine!();
-            //TODO: replace with `spdk_bdev_write_zeroes_blocks()` (need to add wrapper first)
-            spdk_rs::bdev::write_zeroes(desc.clone(), &io_channel, 0, 512);
-        }
+        spdk_rs::bdev::write_zeroes(desc.clone(), &io_channel, 0, write_size_numeric);  
     });
+    let duration = start.elapsed();
 
+    debug!("Time elapsed in write {} bytes is: {:?}", write_size, duration);
+    let throughput = write_size_numeric as f64 / utils_rustfs::convert_time(duration, "s");
+    debug!("throughput: {} byte/s", throughput);
+
+    //TODO: convert throughput to MB/s and test it against NVMe SSD
+    println!("throughput: {} MB/s", utils_rustfs::convert(throughput.to_string().as_str(), "B", "MB"));
+
+    
     spdk_rs::thread::put_io_channel(io_channel);
     spdk_rs::bdev::close(desc);
     spdk_rs::event::app_stop(true);
@@ -155,7 +165,7 @@ fn rust_seq() {
     println!("Successfully shutdown SPDK framework");
 }
 
-// parse the configuration file
+/// parse the configuration file "language.toml"
 fn parse_config() -> Result<toml::Value, Error> {
     let contents = fs::read_to_string("config/language.toml")
         .expect("Something went wrong reading the file");
@@ -170,7 +180,6 @@ pub fn main() {
         .parse(&env::var("RUSTFS_BENCHMARKS_LANGUAGE_LOG").unwrap_or_default())
         .init();
        
-    let dict = parse_config().unwrap();
-    //dd_seq(&dict);
+    //dd_seq();
     rust_seq();
 }
