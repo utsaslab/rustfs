@@ -3,7 +3,11 @@
 #[macro_use]
 extern crate log;
 extern crate env_logger;
+extern crate failure;
 
+use failure::Error;
+use std::fs::File;
+use std::io::prelude::*;
 use std::time::Duration;
 
 /// NOTE: caller needs to have env_loger::init() in its environment to make macro work (i.e., print when log is enabled)
@@ -107,6 +111,21 @@ pub fn convert_time(duration: Duration, _unit: &str) -> f64 {
     }
 }
 
+/// Generate `size` byte random string
+pub fn generate_string(size: usize) -> Result<String, Error> {
+    let mut f = File::open("/dev/urandom")?;
+    let mut buffer: Vec<u8> = vec![0; size];
+    let size = f.read(buffer.as_mut_slice()).unwrap();
+    //debug!("read_size: {}", size);
+    let string_buffer = unsafe { String::from_utf8_unchecked(buffer) };
+    //debug!("string_buffer: {}", string_buffer);
+    //debug!("string_buffer len: {}", string_buffer.len());
+    let mut string_buffer_raw = String::from(string_buffer.to_owned());
+    string_buffer_raw.truncate(size);
+    assert_eq!(size, string_buffer_raw.len());
+    Ok(string_buffer_raw)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -157,5 +176,12 @@ mod tests {
             convert_time(Duration::from_micros(1_000_002), "us"),
             1_000_002.0
         );
+    }
+
+    #[test]
+    fn test_generate_string() {
+        generate_string(10).unwrap();
+        generate_string(2073).unwrap();
+        generate_string(1_073_741_824).unwrap();
     }
 }
