@@ -173,6 +173,7 @@ pub async fn write<'a>(desc: SpdkBdevDesc,
                            nbytes: u64) -> Result<(), Error> {
   let (sender, receiver) = oneshot::channel();
   let ret: i32;
+  debug!("nbytes: {}", nbytes);
   unsafe {
       ret = raw::spdk_bdev_write(
           desc.raw,

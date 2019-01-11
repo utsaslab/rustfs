@@ -49,13 +49,13 @@ impl Buf {
             let fd = libc::open(path, libc::O_RDONLY);
             let ptr = self.to_raw() as *mut c_char;
 
-            let mut left_to_read: isize = size as isize;
+            let mut left_to_read: isize = size as isize - 2;
             let mut n_to_read: usize = 33554431;
             let mut read_start: usize = 0;
 
             let mut i: u32 = 0;
             while left_to_read > 0 && i <= 40 {
-                if read_start + n_to_read > size {
+                if read_start + n_to_read > size - 2 {
                     n_to_read = left_to_read as usize;
                 }
                 debug!("n_to_read: {}", n_to_read);
@@ -68,6 +68,12 @@ impl Buf {
                 debug!("left_to_read: {}", left_to_read);
                 i += 1;
             }
+            
+            // Just for safe, we write newline and null terminator to the buffer
+            *(self.to_raw() as *mut u8).offset(read_start as isize) = '\n' as u8;
+            read_start += 1;
+            *(self.to_raw() as *mut u8).offset(read_start as isize) = '\0' as u8;            
+            
             // take a look at what buffer may contain
             for i in 0..30 {
                 debug!("{}", *(self.to_raw() as *mut u8).offset(i) as char);

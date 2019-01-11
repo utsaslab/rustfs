@@ -133,11 +133,16 @@ async fn run_inner() -> Result<(), Error> {
     let mut write_buf = spdk_rs::env::dma_zmalloc(write_size_numeric as usize, buf_align);
     write_buf.fill_random(write_size_numeric as usize);
 
+    debug!("write_size_numeric: {}", write_size_numeric);
     // let's time the execution of the write
     let start = Instant::now();
-    await!( async {
-        spdk_rs::bdev::write(desc.clone(), &io_channel, &write_buf, 0, blk_size as u64)
-    });
+    // await!( async {
+    //     spdk_rs::bdev::write(desc.clone(), &io_channel, &write_buf, 0, write_size_numeric)
+    // });
+    match await!(spdk_rs::bdev::write(desc.clone(), &io_channel, &write_buf, 0, write_size_numeric)) {
+        Ok(_) => println!("Successfully write to bdev"),
+        _ => {}
+    }
     let duration = start.elapsed();
     println!("Successfully write to bdev");
     
