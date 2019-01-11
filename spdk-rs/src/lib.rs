@@ -19,18 +19,22 @@ extern crate futures_new;
 #[macro_use]
 extern crate tokio;
 
-pub mod event;
+#[macro_use]
+extern crate log;
+extern crate env_logger;
+
 pub mod bdev;
+pub mod bdev_module;
 pub mod context;
 pub mod env;
-pub mod bdev_module;
-pub mod thread;
-pub mod run;
+pub mod event;
 pub mod executor;
 pub mod io_channel;
+pub mod run;
+pub mod thread;
 
-pub use event::{SpdkAppOpts, app_stop};
 pub use bdev::{SpdkBdev, SpdkBdevDesc};
+pub use bdev_module::SpdkBdevIO;
 pub use context::{AppContext, SpdkBdevIoCompletionCb};
-pub use env::{Buf};
-pub use bdev_module::{SpdkBdevIO};
+pub use env::Buf;
+pub use event::{app_stop, SpdkAppOpts};

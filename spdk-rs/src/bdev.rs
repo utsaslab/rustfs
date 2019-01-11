@@ -256,7 +256,7 @@ pub async fn write_zeroes_blocks<'a>(desc: SpdkBdevDesc,
     }
 }
 
-
+/// spdk_bdev_read()
 pub async fn read<'a>(desc: SpdkBdevDesc,
                   ch: &'a thread::SpdkIoChannel,
                   buf: &'a mut env::Buf,
@@ -288,6 +288,13 @@ pub async fn read<'a>(desc: SpdkBdevDesc,
             nbytes,
         ))?,
     }    
+}
+
+/// spdk_bdev_has_write_cache()
+pub fn has_write_cache(bdev: SpdkBdev) -> bool{
+    unsafe {
+        raw::spdk_bdev_has_write_cache(bdev.to_raw())
+    }
 }
 
 impl SpdkBdev {

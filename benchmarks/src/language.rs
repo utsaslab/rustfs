@@ -111,6 +111,11 @@ async fn run_inner() -> Result<(), Error> {
     let bdev = ret.unwrap();
     let mut desc = spdk_rs::bdev::SpdkBdevDesc::new();
 
+    // check whether device has volatile write cache enabled
+    // if it's true, we may want to call `spdk_bdev_flush()` to flush the writes (not implemented for now)
+    let is_write_cache_enabled = spdk_rs::bdev::has_write_cache(bdev.clone());
+    debug!("is_write_cache_enabled: {}", is_write_cache_enabled);
+    
     match spdk_rs::bdev::open(bdev.clone(), true, &mut desc) {
         Ok(_) => println!("Successfully open the device {}", bdev.name()),
         _ => {}
@@ -124,20 +129,23 @@ async fn run_inner() -> Result<(), Error> {
     let buf_align = spdk_rs::bdev::get_buf_align(bdev.clone());
     println!("buf_align: {}", buf_align);
 
+    // we want to prepare a buffer with random content to write
+    let mut write_buf = spdk_rs::env::dma_zmalloc(write_size_numeric as usize, buf_align);
+    write_buf.fill_random(write_size_numeric as usize);
+
     // let's time the execution of the write
     let start = Instant::now();
     await!( async {
-        spdk_rs::bdev::write_zeroes(desc.clone(), &io_channel, 0, write_size_numeric);  
+        spdk_rs::bdev::write(desc.clone(), &io_channel, &write_buf, 0, blk_size as u64)
     });
     let duration = start.elapsed();
-
+    println!("Successfully write to bdev");
+    
     debug!("Time elapsed in write {} bytes is: {:?}", write_size, duration);
     let throughput = write_size_numeric as f64 / utils_rustfs::convert_time(duration, "s");
     debug!("throughput: {} byte/s", throughput);
 
-    //TODO: convert throughput to MB/s and test it against NVMe SSD
     println!("throughput: {} MB/s", utils_rustfs::convert(throughput.to_string().as_str(), "B", "MB"));
-
     
     spdk_rs::thread::put_io_channel(io_channel);
     spdk_rs::bdev::close(desc);
