@@ -59,7 +59,7 @@ impl Buf {
                 }
                 debug!("n_to_read: {}", n_to_read);
                 let mut read_size =
-                    libc::read(fd, self.to_raw().add(read_start) as *mut c_void, n_to_read);
+                    libc::read(fd, self.to_raw().add(read_start) as *mut libc::c_void, n_to_read);
                 if read_size == -1 {
                     // there is error, we try to fill the fixed content instead
                     read_size = self.fill_fixed(size, "AAA") as isize;
