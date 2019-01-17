@@ -88,11 +88,18 @@ async fn run(poller: spdk_rs::io_channel::PollerHandle, _test_path_enabled: bool
 async fn run_inner(_test_path_enabled: bool) -> Result<(), Error> {
     let dict = parse_config().unwrap();
 
-    let mut of_path = utils_rustfs::strip(dict["common"]["SSD_PATH"].to_string());
-    let of_path = [of_path, String::from("testfile")].join("/");
-    let mut bs = utils_rustfs::strip(dict["sequential_write"]["BS"].to_string());
-    let count = dict["sequential_write"]["COUNT"].to_string();
-    let oflag = utils_rustfs::strip(dict["sequential_write"]["oflag"].to_string());
+    let mut bs = String::new();
+    let mut count = String::new();
+
+    if _test_path_enabled {
+        bs = utils_rustfs::strip(dict["sequential_write_test"]["BS"].to_string());
+        debug!("bs: {}", bs);
+        count = String::from("1");
+        debug!("count: {}", count);
+    } else {
+        bs = utils_rustfs::strip(dict["sequential_write"]["BS"].to_string());
+        count = dict["sequential_write"]["COUNT"].to_string();
+    }
 
     // let's first calculate how much we should write to the device
     let mut num = String::from("");

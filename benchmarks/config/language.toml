@@ -8,11 +8,15 @@ DEVICE = "/dev/nvme0n1"
 [sequential_write]
 # Block size
 BS = "1G"
-#BS="10MB"
 # dd's `count=` (e.g. 120)
 COUNT = 1
 # dd's `dsync`
 oflag = "dsync"
+
+# Setup to verify the Rust + SPDK sequential write implementatio
+[sequential_write_test]
+BS="10MB"
+
 
 # Setup to measure the latency
 [random_write]
