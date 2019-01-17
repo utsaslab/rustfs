@@ -147,7 +147,6 @@ async fn run_inner() -> Result<(), Error> {
     let mut buffer_vec = Vec::new();
     for i in 0..num_chunks {
         let mut write_buf = spdk_rs::env::dma_zmalloc(write_buf_size, buf_align);
-        //write_buf.fill_random(write_buf_size);
         write_buf.fill_fixed(write_buf_size, "A");
         buffer_vec.push(write_buf);
     }
