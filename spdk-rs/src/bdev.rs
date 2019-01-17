@@ -1,4 +1,13 @@
-/// FFI for "bdev.h"
+/*************************************************************************
+  > File Name:       bdev.rs
+  > Author:          Zeyuan Hu
+  > Mail:            iamzeyuanhu@utexas.edu
+  > Created Time:    9/16/18
+  > Description:
+    
+    FFI for "bdev.h"
+ ************************************************************************/
+
 use crate::env;
 use crate::raw;
 use crate::thread;

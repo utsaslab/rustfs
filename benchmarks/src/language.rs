@@ -5,9 +5,13 @@
  > Created Time:    12/15/18
  > Description:
 
-   Benchmark how much overhead is imposed by Rust language wrapper
+   Benchmark:
+
+   1. Sequential write throughput for Rust + SPDK vs. dd
+   2. Random write latency for Rust + SPDK vs. dd
 ************************************************************************/
 
+use colored::*;
 use env_logger::Builder;
 use failure::Error;
 use std::env;
@@ -73,15 +77,15 @@ fn dd_seq() {
     assert!(output.status.success());
 }
 
-async fn run(poller: spdk_rs::io_channel::PollerHandle) {
-    match await!(run_inner()) {
+async fn run(poller: spdk_rs::io_channel::PollerHandle, _test_path_enabled: bool) {
+    match await!(run_inner(_test_path_enabled)) {
         Ok(_) => println!("Successful"),
         Err(err) => println!("Failure: {:?}", err),
     }
     spdk_rs::event::app_stop(true);
 }
 
-async fn run_inner() -> Result<(), Error> {
+async fn run_inner(_test_path_enabled: bool) -> Result<(), Error> {
     let dict = parse_config().unwrap();
 
     let mut of_path = utils_rustfs::strip(dict["common"]["SSD_PATH"].to_string());
@@ -160,12 +164,12 @@ async fn run_inner() -> Result<(), Error> {
             desc.clone(),
             &io_channel,
             &buffer_vec[i],
-            (i*write_buf_size) as u64,
+            (i * write_buf_size) as u64,
             write_buf_size as u64
         )) {
-            Ok(_) => {},
+            Ok(_) => {}
             Err(error) => panic!("{:?}", error),
-        }        
+        }
     }
     let duration = start.elapsed();
 
@@ -181,20 +185,31 @@ async fn run_inner() -> Result<(), Error> {
         utils_rustfs::convert(throughput.to_string().as_str(), "B", "MB")
     );
 
-    // Let's read the data from the disk to make sure all the writes are on the disk
-    let mut read_buf = spdk_rs::env::dma_zmalloc(write_buf_size, buf_align);
-    for i in 0..num_chunks {
-        match await!(spdk_rs::bdev::read(desc.clone(), &io_channel, &mut read_buf, (i*write_buf_size) as u64, write_buf_size as u64)) {
-            Ok(_) => {
-                // We check the buffer
-                unsafe {
-                    for i in 0..write_buf_size {
-                        assert!(*(read_buf.to_raw() as *mut u8).offset(i as isize) as char == 'A');
-                    }                    
+    if _test_path_enabled {
+        print!("{}", "Check 1: Let's read the data from the disk to make sure all the writes are on the disk".green());
+        let mut read_buf = spdk_rs::env::dma_zmalloc(write_buf_size, buf_align);
+        for i in 0..num_chunks {
+            match await!(spdk_rs::bdev::read(
+                desc.clone(),
+                &io_channel,
+                &mut read_buf,
+                (i * write_buf_size) as u64,
+                write_buf_size as u64
+            )) {
+                Ok(_) => {
+                    // We check the buffer
+                    unsafe {
+                        for i in 0..write_buf_size {
+                            assert!(
+                                *(read_buf.to_raw() as *mut u8).offset(i as isize) as char == 'A'
+                            );
+                        }
+                    }
                 }
+                Err(error) => panic!("{:}", error),
             }
-            Err(error) => panic!("{:}", error),
         }
+        println!("{}", " ... ok".green());
     }
 
     spdk_rs::thread::put_io_channel(io_channel);
@@ -205,7 +220,7 @@ async fn run_inner() -> Result<(), Error> {
 
 /// Use the SPDK framework to perform sequential write
 /// and calculate the throughput
-fn rust_seq() {
+fn rust_seq(_test_path_enabled: bool) {
     let config_file = Path::new("config/bdev.conf").canonicalize().unwrap();
     let mut opts = spdk_rs::event::SpdkAppOpts::new();
 
@@ -217,10 +232,21 @@ fn rust_seq() {
         mem::forget(executor);
 
         let poller = spdk_rs::io_channel::poller_register(spdk_rs::executor::pure_poll);
-        spdk_rs::executor::spawn(run(poller));
+        spdk_rs::executor::spawn(run(poller, _test_path_enabled));
     });
 
     println!("Successfully shutdown SPDK framework");
+}
+
+/// Test the Rust + SPDK sequential write correctness
+/// We perform the following two checks:
+/// 1. Once the write is finished, we immediately read from the disk and see if the read content and write content are exactly the same.
+/// 2. a) Generate a big random file b) we write the file to the disk using SPDK c) we reset the driver and shutdown SPDK framework
+///    d) We setup the driver and start the SPDK framework again e) we read the content from disk to another file f) we compare sha256 checksums of the two files
+#[test]
+fn rust_seq_test() {
+    // Perform check 1
+    rust_seq(true);
 }
 
 /// parse the configuration file "language.toml"
@@ -239,5 +265,5 @@ pub fn main() {
         .init();
 
     //dd_seq();
-    rust_seq();
+    rust_seq(false);
 }
