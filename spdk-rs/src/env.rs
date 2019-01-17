@@ -133,7 +133,8 @@ mod tests {
             let mut buffer_size = 5;
             let mut buffer = libc::malloc(mem::size_of::<c_char>() * buffer_size);
             let mut buf = Buf::from_raw(buffer as *mut c_void);
-            buf.fill_fixed(buffer_size, "A");
+            let write_size = buf.fill_fixed(buffer_size, "A");
+            assert!(write_size == buffer_size);
             for i in 0..buffer_size {
                 assert!(*(buf.to_raw() as *mut u8).offset(i as isize) as char == 'A');
             }

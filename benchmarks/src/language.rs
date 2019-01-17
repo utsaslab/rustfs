@@ -138,38 +138,36 @@ async fn run_inner() -> Result<(), Error> {
     let bs_numeric: f64 = bs.parse::<f64>().unwrap();
     let num_blks = (bs_numeric / blk_size as f64).ceil();
     let write_size_numeric: u64 = (blk_size as f64 * num_blks) as u64;
-    debug!("write_size_numeric: {}", write_size_numeric);
 
-    // We divide the write_size_numeric into 1024 bytes chunk (see issue: https://github.com/spdk/spdk/issues/578)
-    let write_buf_size: usize = 1024;
+    // We divide the write_size_numeric into 1MB chunk (see issue: https://github.com/spdk/spdk/issues/578)
+    let write_buf_size: usize = 1048576;
     let num_chunks = (write_size_numeric as f64 / write_buf_size as f64).floor() as usize;
 
     // we want to prepare a vector of buffers with random content
     let mut buffer_vec = Vec::new();
     for i in 0..num_chunks {
         let mut write_buf = spdk_rs::env::dma_zmalloc(write_buf_size, buf_align);
-        write_buf.fill_random(write_buf_size);
+        //write_buf.fill_random(write_buf_size);
+        write_buf.fill_fixed(write_buf_size, "A");
         buffer_vec.push(write_buf);
     }
 
     debug!("write_size_numeric: {}", write_size_numeric);
+    debug!("num_chunks: {}", num_chunks);
     // let's time the execution of the write
     let start = Instant::now();
-    await!( async {
-        for i in 0..num_chunks {
-            spdk_rs::bdev::write(desc.clone(), &io_channel, &buffer_vec[i], (0 + i*write_buf_size) as u64, write_buf_size as u64);
-        }
-    });
-    // match await!(spdk_rs::bdev::write(
-    //     desc.clone(),
-    //     &io_channel,
-    //     &write_buf,
-    //     0,
-    //     write_size_numeric
-    // )) {
-    //     Ok(_) => println!("Successfully write to bdev"),
-    //     Err(error) => println!("{:?}", error),
-    // }
+    for i in 0..num_chunks {
+        match await!(spdk_rs::bdev::write(
+            desc.clone(),
+            &io_channel,
+            &buffer_vec[i],
+            (i*write_buf_size) as u64,
+            write_buf_size as u64
+        )) {
+            Ok(_) => {},
+            Err(error) => panic!("{:?}", error),
+        }        
+    }
     let duration = start.elapsed();
 
     debug!(
@@ -183,6 +181,22 @@ async fn run_inner() -> Result<(), Error> {
         "throughput: {} MB/s",
         utils_rustfs::convert(throughput.to_string().as_str(), "B", "MB")
     );
+
+    // Let's read the data from the disk to make sure all the writes are on the disk
+    let mut read_buf = spdk_rs::env::dma_zmalloc(write_buf_size, buf_align);
+    for i in 0..num_chunks {
+        match await!(spdk_rs::bdev::read(desc.clone(), &io_channel, &mut read_buf, (i*write_buf_size) as u64, write_buf_size as u64)) {
+            Ok(_) => {
+                // We check the buffer
+                unsafe {
+                    for i in 0..write_buf_size {
+                        assert!(*(read_buf.to_raw() as *mut u8).offset(i as isize) as char == 'A');
+                    }                    
+                }
+            }
+            Err(error) => panic!("{:}", error),
+        }
+    }
 
     spdk_rs::thread::put_io_channel(io_channel);
     spdk_rs::bdev::close(desc);
