@@ -2,13 +2,22 @@
 #![feature(duration_float)]
 #[macro_use]
 extern crate log;
+extern crate colored;
 extern crate env_logger;
 extern crate failure;
+extern crate rand;
 
+use colored::*;
 use failure::Error;
-use std::fs::File;
+use rand::distributions::Alphanumeric;
+use rand::{thread_rng, Rng};
+use std::fs;
 use std::io::prelude::*;
+use std::path::Path;
+use std::process;
 use std::time::Duration;
+
+pub mod constant;
 
 /// NOTE: caller needs to have env_loger::init() in its environment to make macro work (i.e., print when log is enabled)
 #[macro_export]
@@ -113,7 +122,7 @@ pub fn convert_time(duration: Duration, _unit: &str) -> f64 {
 
 /// Generate `size` byte random string
 pub fn generate_string(size: usize) -> Result<String, Error> {
-    let mut f = File::open("/dev/urandom")?;
+    let mut f = fs::File::open("/dev/urandom")?;
     let mut buffer: Vec<u8> = vec![0; size];
     let size = f.read(buffer.as_mut_slice()).unwrap();
     //debug!("read_size: {}", size);
@@ -124,6 +133,15 @@ pub fn generate_string(size: usize) -> Result<String, Error> {
     string_buffer_raw.truncate(size);
     assert_eq!(size, string_buffer_raw.len());
     Ok(string_buffer_raw)
+}
+
+/// Generate `size` bytes file with random content
+///  `filename` is expected in absolute path
+pub fn generate_file_random(filename: &str, size: usize) -> std::io::Result<()> {
+    let rand_string: String = thread_rng().sample_iter(&Alphanumeric).take(size).collect();
+    let mut output = fs::File::create(filename)?;
+    write!(output, "{}", rand_string)?;
+    Ok(())
 }
 
 #[cfg(test)]
@@ -182,6 +200,18 @@ mod tests {
     fn test_generate_string() {
         generate_string(10).unwrap();
         generate_string(2073).unwrap();
-        generate_string(1_073_741_824).unwrap();
+    }
+
+    #[test]
+    fn test_generate_file_random() -> std::io::Result<()> {
+        // we test whether we have the file in the designated path and if the size matches expectation
+        let tmp_testfile = "/tmp/rustfs_testfile";
+        let file_size = 10 * constant::MEGABYTE;
+        generate_file_random(tmp_testfile, file_size)?;
+        assert_eq!(Path::new(tmp_testfile).exists(), true);
+        let metadata = fs::metadata(tmp_testfile)?;
+        assert_eq!(file_size, metadata.len() as usize);
+        fs::remove_file(tmp_testfile)?;
+        Ok(())
     }
 }
