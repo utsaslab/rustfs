@@ -8,7 +8,6 @@
    Main driver program to run various benchmarks
 ************************************************************************/
 #![feature(await_macro, async_await, futures_api, nll, generators)]
-#![feature(duration_as_u128)]
 
 extern crate failure;
 extern crate futures;

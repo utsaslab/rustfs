@@ -14,6 +14,7 @@
 use colored::*;
 use env_logger::Builder;
 use failure::Error;
+use futures;
 use std::env;
 use std::fs;
 use std::mem;
@@ -93,9 +94,7 @@ async fn run_inner(_test_path_enabled: bool) -> Result<(), Error> {
 
     if _test_path_enabled {
         bs = utils_rustfs::strip(dict["sequential_write_test"]["BS"].to_string());
-        debug!("bs: {}", bs);
         count = String::from("1");
-        debug!("count: {}", count);
     } else {
         bs = utils_rustfs::strip(dict["sequential_write"]["BS"].to_string());
         count = dict["sequential_write"]["COUNT"].to_string();
@@ -151,7 +150,7 @@ async fn run_inner(_test_path_enabled: bool) -> Result<(), Error> {
     let write_size_numeric: u64 = (blk_size as f64 * num_blks) as u64;
 
     // We divide the write_size_numeric into 1MB chunk (see issue: https://github.com/spdk/spdk/issues/578)
-    let write_buf_size: usize = 1048576;
+    let write_buf_size: usize = utils_rustfs::constant::MEGABYTE;
     let num_chunks = (write_size_numeric as f64 / write_buf_size as f64).floor() as usize;
 
     // we want to prepare a vector of buffers with random content
@@ -193,7 +192,7 @@ async fn run_inner(_test_path_enabled: bool) -> Result<(), Error> {
     );
 
     if _test_path_enabled {
-        print!("{}", "Check 1: Let's read the data from the disk to make sure all the writes are on the disk".green());
+        print!("{}", "Corectness check 1".green());
         let mut read_buf = spdk_rs::env::dma_zmalloc(write_buf_size, buf_align);
         for i in 0..num_chunks {
             match await!(spdk_rs::bdev::read(
@@ -252,8 +251,23 @@ fn rust_seq(_test_path_enabled: bool) {
 ///    d) We setup the driver and start the SPDK framework again e) we read the content from disk to another file f) we compare sha256 checksums of the two files
 #[test]
 fn rust_seq_test() {
+    Builder::new()
+        .parse(&env::var("RUSTFS_BENCHMARKS_LANGUAGE_LOG").unwrap_or_default())
+        .init();
+
     // Perform check 1
     rust_seq(true);
+
+    // TODO: This chunk of code shouldn't belong to here. we probably need to figure out a way to reuse as much code as we can. One idea is to pass
+    // in function pointer of async function (https://doc.rust-lang.org/book/ch19-05-advanced-functions-and-closures.html). However, we need to figure out the async function type
+    // print!("{}", "Check 2: b) we write the file to the disk using SPDK c) we reset the driver and shutdown SPDK framework
+    //             d) We setup the driver and start the SPDK framework again e) we read the content from disk to another file f) we compare sha256 checksums of the two files".green());
+    // // We first generate a large random file
+    // let filename = "/tmp/rustfs_testfile";
+    // utils_rustfs::generate_file_random(filename, utils_rustfs::constant::MEGABYTE);
+    // // We write the file to the disk using SPDK
+
+    // println!("{}", " ... ok".green());
 }
 
 /// parse the configuration file "language.toml"
