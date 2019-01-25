@@ -1,5 +1,7 @@
 //! Contains various utility functions used across crates in the repo
 #![feature(duration_float)]
+#![feature(core_intrinsics)]
+
 #[macro_use]
 extern crate log;
 extern crate colored;
@@ -144,6 +146,11 @@ pub fn generate_file_random(filename: &str, size: usize) -> std::io::Result<()> 
     Ok(())
 }
 
+/// Get type of given variable
+pub fn print_type_of<T>(_: &T) {
+    println!("{}", unsafe { std::intrinsics::type_name::<T>() });
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -213,5 +220,12 @@ mod tests {
         assert_eq!(file_size, metadata.len() as usize);
         fs::remove_file(tmp_testfile)?;
         Ok(())
+    }
+
+    #[test]
+    fn test_print_type_of() {
+        print_type_of(&32.90); // prints "f64"
+        print_type_of(&vec![1, 2, 4]); // prints "std::vec::Vec<i32>"
+        print_type_of(&"foo"); // prints "&str"
     }
 }
