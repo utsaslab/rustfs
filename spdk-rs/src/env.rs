@@ -5,11 +5,17 @@
  > Created Time:    10/10/18
  > Description:
 
-   FFI for "env.h"
+   FFI for "env.h". This file also contains some helper functions that work with
+   the Buf.
+
 ************************************************************************/
 
 use crate::raw;
 use std::ffi::{c_void, CStr, CString};
+use std::fs;
+use std::io;
+use std::io::prelude::*;
+use std::io::SeekFrom;
 use std::os::raw::{c_char, c_int};
 use std::ptr;
 
@@ -58,8 +64,11 @@ impl Buf {
                     n_to_read = left_to_read as usize;
                 }
                 debug!("n_to_read: {}", n_to_read);
-                let mut read_size =
-                    libc::read(fd, self.to_raw().add(read_start) as *mut libc::c_void, n_to_read);
+                let mut read_size = libc::read(
+                    fd,
+                    self.to_raw().add(read_start) as *mut libc::c_void,
+                    n_to_read,
+                );
                 if read_size == -1 {
                     // there is error, we try to fill the fixed content instead
                     read_size = self.fill_fixed(size, "AAA") as isize;
@@ -107,6 +116,30 @@ impl Buf {
         }
     }
 
+    /// Fill in the buffer with content from file `filename` with start position `start_pos` and
+    /// with size `usize` (in bytes)
+    pub fn fill_from_file(&mut self, filename: &str, start_pos: usize, size: usize) {
+        match fs::metadata(filename) {
+            Ok(attr) => {}
+            Err(_) => panic!("{} does not exist", filename),
+        };
+        unsafe {
+            let owned_filename = CString::new(filename).unwrap();
+            let filename_ptr: *const c_char = owned_filename.as_ptr();
+
+            let owned_mode = CString::new("r").unwrap();
+            let mode_ptr: *const c_char = owned_mode.as_ptr();
+
+            let fp: *mut libc::FILE = libc::fopen(filename_ptr, mode_ptr);
+            libc::fseek(fp, start_pos as i64, libc::SEEK_SET);
+            if libc::fread(self.to_raw() as *mut libc::c_void, size, 1, fp) != 1 {
+                libc::fclose(fp);
+                println!("read fails");
+                libc::exit(1);
+            }
+        }
+    }
+
     pub fn read(&self) -> &'static str {
         unsafe { CStr::from_ptr(self.to_raw() as *const i8).to_str().unwrap() }
     }
@@ -140,5 +173,32 @@ mod tests {
             }
             libc::free(buffer);
         }
+    }
+
+    #[test]
+    fn test_fill_from_file() -> std::io::Result<()> {
+        let filename = "/tmp/test_fill_from_file.txt";
+        let outname = "/tmp/out.txt";
+        let test_string: String = String::from("ABCDEFGHIJKLMN");
+        let length = test_string.len();
+        assert!(length == 14);
+        let mut output = fs::File::create(filename)?;
+        write!(output, "{}", test_string)?;
+        let buffer_size = 2;
+        unsafe {
+            for i in 0..length / buffer_size {
+                let mut buffer = libc::malloc(mem::size_of::<c_char>() * buffer_size);
+                let mut buf = Buf::from_raw(buffer as *mut c_void);
+                buf.fill_from_file(filename, i * buffer_size, buffer_size);
+                for j in 0..buffer_size {
+                    assert!(
+                        *(buf.to_raw() as *mut u8).offset(j as isize) as char
+                            == test_string.chars().nth(i * buffer_size + j).unwrap()
+                    );
+                }
+                libc::free(buffer);
+            }
+        }
+        Ok(())
     }
 }
