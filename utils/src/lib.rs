@@ -8,13 +8,18 @@ extern crate colored;
 extern crate env_logger;
 extern crate failure;
 extern crate rand;
+#[macro_use]
+extern crate hex_literal;
 
 use colored::*;
 use failure::Error;
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
+use sha2::{Digest, Sha256};
 use std::fs;
+use std::io;
 use std::io::prelude::*;
+use std::io::Write;
 use std::path::Path;
 use std::process;
 use std::time::Duration;
@@ -151,6 +156,17 @@ pub fn print_type_of<T>(_: &T) {
     println!("{}", unsafe { std::intrinsics::type_name::<T>() });
 }
 
+/// Calculate the Sha256 checksum of the given `filename` and save the checksum to file `save_location`
+pub fn get_checksum(filename: &str, save_location: &str) -> std::io::Result<()> {
+    let mut hasher = Sha256::new();
+    let mut file = fs::File::open(filename)?;
+    let n = io::copy(&mut file, &mut hasher)?;
+    let hash = hasher.result();
+    let mut output = fs::File::create(save_location)?;
+    write!(&mut output, "{:x}", hash)?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -212,7 +228,7 @@ mod tests {
     #[test]
     fn test_generate_file_random() -> std::io::Result<()> {
         // we test whether we have the file in the designated path and if the size matches expectation
-        let tmp_testfile = "/tmp/rustfs_testfile";
+        let tmp_testfile = "rustfs_testfile";
         let file_size = 10 * constant::MEGABYTE;
         generate_file_random(tmp_testfile, file_size)?;
         assert_eq!(Path::new(tmp_testfile).exists(), true);
@@ -227,5 +243,30 @@ mod tests {
         print_type_of(&32.90); // prints "f64"
         print_type_of(&vec![1, 2, 4]); // prints "std::vec::Vec<i32>"
         print_type_of(&"foo"); // prints "&str"
+    }
+
+    #[test]
+    fn test_get_checksum() -> std::io::Result<()> {
+        let filename = "test_get_checksum.txt";
+        let save_location = "test_get_checksum_save_location.txt";
+        let mut file = fs::File::create(filename)?;
+        file.write_all(b"hello world")?;
+        get_checksum(filename, save_location)?;
+
+        file = fs::File::open(save_location)?;
+        let mut contents = String::new();
+        file.read_to_string(&mut contents)?;
+
+        let mut hasher = Sha256::new();
+        hasher.input(b"hello world");
+        let result = hasher.result();
+        let result_literal = format!("{:x}", result);
+        // compare two hash value to ensure they are the same;
+        assert_eq!(contents, result_literal);
+
+        fs::remove_file(filename)?;
+        fs::remove_file(save_location)?;
+
+        Ok(())
     }
 }
