@@ -15,11 +15,17 @@ use colored::*;
 use env_logger::Builder;
 use failure::Error;
 use futures;
+use sha2::{Digest, Sha256};
 use std::env;
 use std::fs;
+use std::fs::OpenOptions;
+use std::io;
+use std::io::prelude::*;
+use std::io::Write;
 use std::mem;
 use std::path::Path;
 use std::process;
+use std::thread;
 use std::time::{Duration, Instant};
 use toml::Value;
 use utils_rustfs;
@@ -82,6 +88,12 @@ async fn run(poller: spdk_rs::io_channel::PollerHandle, _test_path_enabled: bool
     match await!(run_inner(_test_path_enabled)) {
         Ok(_) => println!("Successful"),
         Err(err) => println!("Failure: {:?}", err),
+    }
+    if _test_path_enabled {
+        match await!(run_inner_check2()) {
+            Ok(_) => println!("Successful"),
+            Err(err) => println!("Failure: {:?}", err),
+        }
     }
     spdk_rs::event::app_stop(true);
 }
@@ -192,7 +204,7 @@ async fn run_inner(_test_path_enabled: bool) -> Result<(), Error> {
     );
 
     if _test_path_enabled {
-        print!("{}", "Corectness check 1".green());
+        print!("{}", "Correctness check 1".green());
         let mut read_buf = spdk_rs::env::dma_zmalloc(write_buf_size, buf_align);
         for i in 0..num_chunks {
             match await!(spdk_rs::bdev::read(
@@ -226,7 +238,13 @@ async fn run_inner(_test_path_enabled: bool) -> Result<(), Error> {
 
 /// Use the SPDK framework to perform sequential write
 /// and calculate the throughput
-fn rust_seq(_test_path_enabled: bool) {
+fn rust_seq<
+    G: std::future::Future<Output = ()> + 'static,
+    F: Fn(spdk_rs::io_channel::PollerHandle, bool) -> G,
+>(
+    async_fn: F,
+    _test_path_enabled: bool,
+) {
     let config_file = Path::new("config/bdev.conf").canonicalize().unwrap();
     let mut opts = spdk_rs::event::SpdkAppOpts::new();
 
@@ -238,10 +256,118 @@ fn rust_seq(_test_path_enabled: bool) {
         mem::forget(executor);
 
         let poller = spdk_rs::io_channel::poller_register(spdk_rs::executor::pure_poll);
-        spdk_rs::executor::spawn(run(poller, _test_path_enabled));
+        spdk_rs::executor::spawn(async_fn(poller, _test_path_enabled));
     });
 
     println!("Successfully shutdown SPDK framework");
+}
+
+async fn run_inner_check2() -> Result<(), Error> {
+    print!("{}", "Correctness check 2".green());
+
+    // For simplicity, file_size should be multiple of 1MB
+    let num_chunks = 1;
+    let write_buf_size = utils_rustfs::constant::MEGABYTE;
+    let file_size = write_buf_size * num_chunks;
+
+    // We first generate a large random file
+    let filename = "run_inner_check2_test_file_origin.txt";
+    utils_rustfs::generate_file_random(filename, file_size);
+
+    // We write the file to the disk using SPDK
+    let ret = spdk_rs::bdev::get_by_name("Nvme0n1");
+    let bdev = ret.unwrap();
+    let mut desc = spdk_rs::bdev::SpdkBdevDesc::new();
+
+    match spdk_rs::bdev::open(bdev.clone(), true, &mut desc) {
+        Ok(_) => println!("Successfully open the device {}", bdev.name()),
+        _ => {}
+    };
+    let io_channel = spdk_rs::bdev::get_io_channel(desc.clone())?;
+    let blk_size = spdk_rs::bdev::get_block_size(bdev.clone());
+    let buf_align = spdk_rs::bdev::get_buf_align(bdev.clone());
+
+    let mut buffer_vec = Vec::new();
+    for i in 0..num_chunks {
+        let mut write_buf = spdk_rs::env::dma_zmalloc(write_buf_size, buf_align);
+        write_buf.fill_from_file(filename, i * write_buf_size, write_buf_size);
+        buffer_vec.push(write_buf);
+    }
+
+    for i in 0..num_chunks {
+        match await!(spdk_rs::bdev::write(
+            desc.clone(),
+            &io_channel,
+            &buffer_vec[i],
+            (i * write_buf_size) as u64,
+            write_buf_size as u64
+        )) {
+            Ok(_) => {}
+            Err(error) => panic!("{:?}", error),
+        }
+    }
+
+    // Let's see part of what we have written
+    println!("{}", "Let's see what we have written".yellow());
+    let mut read_buf = spdk_rs::env::dma_zmalloc(write_buf_size, buf_align);
+    for i in 0..1 {
+        match await!(spdk_rs::bdev::read(
+            desc.clone(),
+            &io_channel,
+            &mut read_buf,
+            (i * write_buf_size) as u64,
+            write_buf_size as u64
+        )) {
+            Ok(_) => println!("we have written (part of): {}", read_buf.read()),
+            Err(error) => panic!("{:}", error),
+        }
+    }
+
+    // We calculate the check sum of the large random file and save it to the disk.
+    // Next time, we check whether such file exists, if so, we read content from disk
+    // into another file and compare the checksum.
+    // The block can possible be modified between two runs. Thus, we use a script to call
+    // program twice and ensure there is no others run the same program. In other words, please
+    // touch SPDK during the test.
+    let checksum_filename = "checksum_origin.txt";
+    if !Path::new(checksum_filename).exists() {
+        debug!("{} not exists!", checksum_filename.yellow());
+        utils_rustfs::get_checksum(filename, checksum_filename);
+    } else {
+        let checksum_filename_new = "checksum_new.txt";
+        let filename_new = "run_inner_check2_test_file_new.txt";
+        let mut read_buf = spdk_rs::env::dma_zmalloc(write_buf_size, buf_align);
+        for i in 0..num_chunks {
+            match await!(spdk_rs::bdev::read(
+                desc.clone(),
+                &io_channel,
+                &mut read_buf,
+                (i * write_buf_size) as u64,
+                write_buf_size as u64
+            )) {
+                Ok(_) => {
+                    // We write the read_buf content into the file
+                    let mut file_new = fs::File::create(filename_new)?;
+                    file_new = OpenOptions::new().append(true).open(filename_new)?;
+                    write!(&mut file_new, "{}", read_buf.read());
+                }
+                Err(error) => panic!("{:}", error),
+            }
+        }
+        // Let's calculate the new checksum
+        utils_rustfs::get_checksum(filename_new, checksum_filename_new)?;
+        // Let's compare the checksum
+        let mut file = fs::File::open(checksum_filename)?;
+        let mut checksum_origin = String::new();
+        file.read_to_string(&mut checksum_origin);
+        file = fs::File::open(checksum_filename_new)?;
+        let mut checksum_new = String::new();
+        file.read_to_string(&mut checksum_new);
+        assert_eq!(checksum_origin, checksum_new);
+        println!("{}", " ... ok".green());
+    }
+
+    Ok(())
 }
 
 /// Test the Rust + SPDK sequential write correctness
@@ -255,19 +381,8 @@ fn rust_seq_test() {
         .parse(&env::var("RUSTFS_BENCHMARKS_LANGUAGE_LOG").unwrap_or_default())
         .init();
 
-    // Perform check 1
-    rust_seq(true);
-
-    // TODO: This chunk of code shouldn't belong to here. we probably need to figure out a way to reuse as much code as we can. One idea is to pass
-    // in function pointer of async function (https://doc.rust-lang.org/book/ch19-05-advanced-functions-and-closures.html). However, we need to figure out the async function type
-    // print!("{}", "Check 2: b) we write the file to the disk using SPDK c) we reset the driver and shutdown SPDK framework
-    //             d) We setup the driver and start the SPDK framework again e) we read the content from disk to another file f) we compare sha256 checksums of the two files".green());
-    // // We first generate a large random file
-    // let filename = "/tmp/rustfs_testfile";
-    // utils_rustfs::generate_file_random(filename, utils_rustfs::constant::MEGABYTE);
-    // // We write the file to the disk using SPDK
-
-    // println!("{}", " ... ok".green());
+    // Perform check 1 and check 2
+    rust_seq(run, true);
 }
 
 /// parse the configuration file "language.toml"
@@ -286,5 +401,5 @@ pub fn main() {
         .init();
 
     //dd_seq();
-    rust_seq(false);
+    rust_seq(run, false);
 }

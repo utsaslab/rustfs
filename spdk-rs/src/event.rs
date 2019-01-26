@@ -1,19 +1,19 @@
 /*************************************************************************
-  > File Name:       event.rs
-  > Author:          Zeyuan Hu
-  > Mail:            iamzeyuanhu@utexas.edu
-  > Created Time:    10/2/18
-  > Description:
-    
-    FFI for "event.h"
- ************************************************************************/
+ > File Name:       event.rs
+ > Author:          Zeyuan Hu
+ > Mail:            iamzeyuanhu@utexas.edu
+ > Created Time:    10/2/18
+ > Description:
+
+   FFI for "event.h"
+************************************************************************/
 
 use crate::bdev::{SpdkBdev, SpdkBdevDesc};
 use crate::raw;
 
 use failure::Error;
-use std::os::raw::{c_char, c_void};
 use std::ffi::{CStr, CString};
+use std::os::raw::{c_char, c_void};
 use std::ptr;
 
 #[derive(Debug, Fail)]
@@ -47,14 +47,14 @@ impl SpdkAppOpts {
     }
 
     pub fn start<F>(mut self, f: F) -> Result<(), Error>
-        where
-            F: FnMut() -> (),
+    where
+        F: FnMut() -> (),
     {
         let user_data = &f as *const _ as *mut c_void;
 
         extern "C" fn start_wrapper<F>(closure: *mut c_void, _: *mut c_void)
-            where
-                F: FnMut() -> (),
+        where
+            F: FnMut() -> (),
         {
             let opt_closure = closure as *mut F;
             unsafe { (*opt_closure)() }
@@ -72,9 +72,9 @@ impl SpdkAppOpts {
         };
 
         unsafe {
-//            if (context.buff != ptr::null_mut()) {
-//                raw::spdk_dma_free(context.buff as *mut c_void);
-//            }
+            //            if (context.buff != ptr::null_mut()) {
+            //                raw::spdk_dma_free(context.buff as *mut c_void);
+            //            }
             raw::spdk_app_fini();
         }
 

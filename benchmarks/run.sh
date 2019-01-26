@@ -16,6 +16,7 @@ elif [ "$1" =  "clean" ]; then
     cargo clean
 elif [ "$1" = "test" ]; then
     cargo test -- --nocapture
+    cargo test -- --nocapture
 else
     cargo run
 fi
