@@ -118,7 +118,12 @@ impl Buf {
 
     /// Fill in the buffer with content from file `filename` with start position `start_pos` and
     /// with size `usize` (in bytes)
-    pub fn fill_from_file(&mut self, filename: &str, start_pos: usize, size: usize) {
+    pub fn fill_from_file(
+        &mut self,
+        filename: &str,
+        start_pos: usize,
+        size: usize,
+    ) -> libc::ssize_t {
         match fs::metadata(filename) {
             Ok(attr) => {}
             Err(_) => panic!("{} does not exist", filename),
@@ -132,16 +137,25 @@ impl Buf {
 
             let fp: *mut libc::FILE = libc::fopen(filename_ptr, mode_ptr);
             libc::fseek(fp, start_pos as i64, libc::SEEK_SET);
-            if libc::fread(self.to_raw() as *mut libc::c_void, size, 1, fp) != 1 {
+            let fd: libc::c_int = libc::fileno(fp);
+            let num_read = libc::read(fd, self.to_raw() as *mut libc::c_void, size);
+            // add null terminator to the end of string
+            //*(self.to_raw() as *mut u8).offset(num_read + 1 as isize) = '\0' as u8;
+            if num_read == -1 {
                 libc::fclose(fp);
                 println!("read fails");
                 libc::exit(1);
             }
+            num_read
         }
     }
 
     pub fn read(&self) -> &'static str {
-        unsafe { CStr::from_ptr(self.to_raw() as *const i8).to_str().unwrap() }
+        unsafe {
+            CStr::from_ptr(self.to_raw() as *const c_char)
+                .to_str()
+                .unwrap()
+        }
     }
 }
 
@@ -184,13 +198,13 @@ mod tests {
         assert!(length == 14);
         let mut output = fs::File::create(filename)?;
         write!(output, "{}", test_string)?;
-        let buffer_size = 2;
+        let buffer_size = 3;
         unsafe {
-            for i in 0..length / buffer_size {
+            for i in 0..length {
                 let mut buffer = libc::malloc(mem::size_of::<c_char>() * buffer_size);
                 let mut buf = Buf::from_raw(buffer as *mut c_void);
-                buf.fill_from_file(filename, i * buffer_size, buffer_size);
-                for j in 0..buffer_size {
+                let num_read = buf.fill_from_file(filename, i * buffer_size, buffer_size);
+                for j in 0..num_read as usize {
                     assert!(
                         *(buf.to_raw() as *mut u8).offset(j as isize) as char
                             == test_string.chars().nth(i * buffer_size + j).unwrap()

@@ -133,8 +133,8 @@ async fn run_inner(_test_path_enabled: bool) -> Result<(), Error> {
     let bs = utils_rustfs::convert(num_int.to_string().as_str(), unit.as_str(), "B");
     debug!("bs: {}", bs);
 
-    //let ret = spdk_rs::bdev::get_by_name("Malloc0");
-    let ret = spdk_rs::bdev::get_by_name("Nvme0n1");
+    let ret = spdk_rs::bdev::get_by_name("Malloc0");
+    //let ret = spdk_rs::bdev::get_by_name("Nvme0n1");
     let bdev = ret.unwrap();
     let mut desc = spdk_rs::bdev::SpdkBdevDesc::new();
 
@@ -267,7 +267,8 @@ async fn run_inner_check2() -> Result<(), Error> {
 
     // For simplicity, file_size should be multiple of 1MB
     let num_chunks = 1;
-    let write_buf_size = utils_rustfs::constant::MEGABYTE;
+    //let write_buf_size = utils_rustfs::constant::MEGABYTE;
+    let write_buf_size = utils_rustfs::constant::BYTE * 1024;
     let file_size = write_buf_size * num_chunks;
 
     // We first generate a large random file
@@ -290,11 +291,14 @@ async fn run_inner_check2() -> Result<(), Error> {
     let mut buffer_vec = Vec::new();
     for i in 0..num_chunks {
         let mut write_buf = spdk_rs::env::dma_zmalloc(write_buf_size, buf_align);
-        write_buf.fill_from_file(filename, i * write_buf_size, write_buf_size);
+        let num_read = write_buf.fill_from_file(filename, i * write_buf_size, write_buf_size);
+        debug!("num_read: {}", num_read);
         buffer_vec.push(write_buf);
     }
+    utils_rustfs::getLine!();
 
     for i in 0..num_chunks {
+        utils_rustfs::getLine!();
         match await!(spdk_rs::bdev::write(
             desc.clone(),
             &io_channel,
@@ -306,6 +310,7 @@ async fn run_inner_check2() -> Result<(), Error> {
             Err(error) => panic!("{:?}", error),
         }
     }
+    utils_rustfs::getLine!();
 
     // Let's see part of what we have written
     println!("{}", "Let's see what we have written".yellow());
@@ -326,9 +331,9 @@ async fn run_inner_check2() -> Result<(), Error> {
     // We calculate the check sum of the large random file and save it to the disk.
     // Next time, we check whether such file exists, if so, we read content from disk
     // into another file and compare the checksum.
-    // The block can possible be modified between two runs. Thus, we use a script to call
-    // program twice and ensure there is no others run the same program. In other words, please
-    // touch SPDK during the test.
+    // The block can possible be modified between two runs. Thus, we use `run.sh` call
+    // `cargo test` twice and ensure there is no others run the same program. In other words, please
+    // don't touch SPDK during the test.
     let checksum_filename = "checksum_origin.txt";
     if !Path::new(checksum_filename).exists() {
         debug!("{} not exists!", checksum_filename.yellow());

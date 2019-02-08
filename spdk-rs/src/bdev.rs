@@ -1,12 +1,12 @@
 /*************************************************************************
-  > File Name:       bdev.rs
-  > Author:          Zeyuan Hu
-  > Mail:            iamzeyuanhu@utexas.edu
-  > Created Time:    9/16/18
-  > Description:
-    
-    FFI for "bdev.h"
- ************************************************************************/
+ > File Name:       bdev.rs
+ > Author:          Zeyuan Hu
+ > Mail:            iamzeyuanhu@utexas.edu
+ > Created Time:    9/16/18
+ > Description:
+
+   FFI for "bdev.h"
+************************************************************************/
 
 use crate::env;
 use crate::raw;
@@ -161,6 +161,7 @@ pub async fn write<'a>(
             cb_arg::<()>(sender),
         );
     };
+    assert!(ret == 0);
     // TODO: we probably need to handle the case where ret != 0
     let res = await!(receiver).expect("Cancellation is not supported");
 
