@@ -127,7 +127,7 @@ pub fn convert_time(duration: Duration, _unit: &str) -> f64 {
     }
 }
 
-/// Generate `size` byte random string
+/// Generate `size` byte random string from "/dev/urandom"
 pub fn generate_string(size: usize) -> Result<String, Error> {
     let mut f = fs::File::open("/dev/urandom")?;
     let mut buffer: Vec<u8> = vec![0; size];
@@ -140,6 +140,12 @@ pub fn generate_string(size: usize) -> Result<String, Error> {
     string_buffer_raw.truncate(size);
     assert_eq!(size, string_buffer_raw.len());
     Ok(string_buffer_raw)
+}
+
+/// Generate `size` byte random string from native sampling of alphabetic + numeric
+pub fn generate_string_alpha(size: usize) -> String {
+    let rand_string: String = thread_rng().sample_iter(&Alphanumeric).take(size).collect();
+    rand_string
 }
 
 /// Generate `size` bytes file with random content

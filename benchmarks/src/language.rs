@@ -273,7 +273,14 @@ async fn run_inner_check2() -> Result<(), Error> {
 
     // We first generate a large random file
     let filename = "run_inner_check2_test_file_origin.txt";
-    utils_rustfs::generate_file_random(filename, file_size);
+    //utils_rustfs::generate_file_random(filename, file_size);
+    let mut file = OpenOptions::new()
+        .create(true)
+        .truncate(true)
+        .append(true)
+        .append(true)
+        .open(filename)
+        .unwrap();
 
     // We write the file to the disk using SPDK
     let ret = spdk_rs::bdev::get_by_name("Nvme0n1");
@@ -291,8 +298,11 @@ async fn run_inner_check2() -> Result<(), Error> {
     let mut buffer_vec = Vec::new();
     for i in 0..num_chunks {
         let mut write_buf = spdk_rs::env::dma_zmalloc(write_buf_size, buf_align);
-        let num_read = write_buf.fill_from_file(filename, i * write_buf_size, write_buf_size);
-        debug!("num_read: {}", num_read);
+        // let num_read = write_buf.fill_from_file(filename, i * write_buf_size, write_buf_size);
+        // debug!("num_read: {}", num_read);
+        let rand_string = utils_rustfs::generate_string_alpha(write_buf_size);
+        write_buf.fill(write_buf_size, "%s\n", &rand_string);
+        writeln!(file, "{}", rand_string)?;
         buffer_vec.push(write_buf);
     }
     utils_rustfs::getLine!();
