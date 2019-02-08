@@ -148,6 +148,13 @@ pub fn generate_string_alpha(size: usize) -> String {
     rand_string
 }
 
+/// Generate `size` byte string with "A"
+pub fn generate_string_fixed(size: usize) -> String {
+    let fixed_string: String = "A".repeat(size);
+    assert!(fixed_string.len() == size);
+    fixed_string
+}
+
 /// Generate `size` bytes file with random content
 ///  `filename` is expected in absolute path
 pub fn generate_file_random(filename: &str, size: usize) -> std::io::Result<()> {

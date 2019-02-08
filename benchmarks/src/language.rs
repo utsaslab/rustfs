@@ -168,8 +168,10 @@ async fn run_inner(_test_path_enabled: bool) -> Result<(), Error> {
     // we want to prepare a vector of buffers with random content
     let mut buffer_vec = Vec::new();
     for i in 0..num_chunks {
-        let mut write_buf = spdk_rs::env::dma_zmalloc(write_buf_size, buf_align);
-        write_buf.fill_fixed(write_buf_size, "A");
+        // +1 for null terminator due to `snprintf` in `fill` implementation
+        let mut write_buf = spdk_rs::env::dma_zmalloc(write_buf_size + 1, buf_align);
+        let fixed_string = utils_rustfs::generate_string_fixed(write_buf_size);
+        write_buf.fill(write_buf_size + 1, "%s", &fixed_string);
         buffer_vec.push(write_buf);
     }
 
@@ -215,14 +217,9 @@ async fn run_inner(_test_path_enabled: bool) -> Result<(), Error> {
                 write_buf_size as u64
             )) {
                 Ok(_) => {
-                    // We check the buffer
-                    unsafe {
-                        for i in 0..write_buf_size {
-                            assert!(
-                                *(read_buf.to_raw() as *mut u8).offset(i as isize) as char == 'A'
-                            );
-                        }
-                    }
+                    let read_buf_string = read_buf.read().to_string();
+                    assert_eq!(read_buf_string.len(), write_buf_size);
+                    assert!("A".repeat(write_buf_size) == read_buf.read().to_string());
                 }
                 Err(error) => panic!("{:}", error),
             }
@@ -277,7 +274,6 @@ async fn run_inner_check2() -> Result<(), Error> {
     let mut file = OpenOptions::new()
         .create(true)
         .truncate(true)
-        .append(true)
         .append(true)
         .open(filename)
         .unwrap();

@@ -18,6 +18,7 @@ use std::io::prelude::*;
 use std::io::SeekFrom;
 use std::os::raw::{c_char, c_int};
 use std::ptr;
+use utils_rustfs;
 
 #[derive(Clone)]
 pub struct Buf {

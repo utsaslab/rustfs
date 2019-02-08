@@ -22,6 +22,7 @@ extern crate tokio;
 #[macro_use]
 extern crate log;
 extern crate env_logger;
+extern crate utils_rustfs;
 
 pub mod bdev;
 pub mod bdev_module;
