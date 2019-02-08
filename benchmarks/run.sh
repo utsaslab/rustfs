@@ -15,6 +15,10 @@ if [ "$1" = "run" ]; then
 elif [ "$1" =  "clean" ]; then
     cargo clean
 elif [ "$1" = "test" ]; then
+    rm -rf run_inner_check2_test_file_new.txt
+    rm -rf run_inner_check2_test_file_origin.txt
+    rm -rf checksum_new.txt
+    rm -rf checksum_origin.txt
     cargo test -- --nocapture
     cargo test -- --nocapture
 else
