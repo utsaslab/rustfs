@@ -271,12 +271,8 @@ async fn run_inner_check2() -> Result<(), Error> {
     // We first generate a large random file
     let filename = "run_inner_check2_test_file_origin.txt";
     //utils_rustfs::generate_file_random(filename, file_size);
-    let mut file = OpenOptions::new()
-        .create(true)
-        .truncate(true)
-        .append(true)
-        .open(filename)
-        .unwrap();
+    let mut output = fs::File::create(filename)?;
+    let mut file = OpenOptions::new().append(true).open(filename).unwrap();
 
     // We write the file to the disk using SPDK
     let ret = spdk_rs::bdev::get_by_name("Nvme0n1");
