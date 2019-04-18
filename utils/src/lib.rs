@@ -2,16 +2,13 @@
 #![feature(duration_float)]
 #![feature(core_intrinsics)]
 
-#[macro_use]
-extern crate log;
 extern crate colored;
 extern crate env_logger;
 extern crate failure;
-extern crate rand;
-#[macro_use]
 extern crate hex_literal;
+extern crate log;
+extern crate rand;
 
-use colored::*;
 use failure::Error;
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
@@ -20,8 +17,6 @@ use std::fs;
 use std::io;
 use std::io::prelude::*;
 use std::io::Write;
-use std::path::Path;
-use std::process;
 use std::time::Duration;
 
 pub mod constant;
@@ -173,7 +168,7 @@ pub fn print_type_of<T>(_: &T) {
 pub fn get_checksum(filename: &str, save_location: &str) -> std::io::Result<()> {
     let mut hasher = Sha256::new();
     let mut file = fs::File::open(filename)?;
-    let n = io::copy(&mut file, &mut hasher)?;
+    io::copy(&mut file, &mut hasher)?;
     let hash = hasher.result();
     let mut output = fs::File::create(save_location)?;
     write!(&mut output, "{:x}", hash)?;
