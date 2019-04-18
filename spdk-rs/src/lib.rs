@@ -1,16 +1,12 @@
 #![feature(nll)]
-#![feature(pin)]
-#![warn(rust_2018_idioms)]
 #![feature(async_await, await_macro, futures_api)]
-#![feature(tool_lints)]
 #![allow(macro_use_extern_crate)]
 #![feature(uniform_paths)]
 #![feature(arbitrary_self_types)]
 
-extern crate libspdk_sys as raw;
+use libspdk_sys as raw;
 #[macro_use]
 extern crate failure;
-extern crate libc;
 #[cfg(test)]
 #[macro_use]
 extern crate hamcrest2;
@@ -31,7 +27,6 @@ pub mod env;
 pub mod event;
 pub mod executor;
 pub mod io_channel;
-pub mod run;
 pub mod thread;
 
 pub use bdev::{SpdkBdev, SpdkBdevDesc};

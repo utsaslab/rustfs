@@ -13,12 +13,9 @@
 use crate::raw;
 use std::ffi::{c_void, CStr, CString};
 use std::fs;
-use std::io;
-use std::io::prelude::*;
-use std::io::SeekFrom;
-use std::os::raw::{c_char, c_int};
+
+use std::os::raw::c_char;
 use std::ptr;
-use utils_rustfs;
 
 #[derive(Clone)]
 pub struct Buf {
@@ -54,7 +51,6 @@ impl Buf {
             let owned_path = CString::new("/dev/urandom").unwrap();
             let path: *const c_char = owned_path.as_ptr();
             let fd = libc::open(path, libc::O_RDONLY);
-            let ptr = self.to_raw() as *mut c_char;
 
             let mut left_to_read: isize = size as isize;
             let mut n_to_read: usize = 33554431;
@@ -126,7 +122,7 @@ impl Buf {
         size: usize,
     ) -> libc::ssize_t {
         match fs::metadata(filename) {
-            Ok(attr) => {}
+            Ok(_) => {}
             Err(_) => panic!("{} does not exist", filename),
         };
         unsafe {

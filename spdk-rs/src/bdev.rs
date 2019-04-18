@@ -11,15 +11,12 @@
 use crate::env;
 use crate::raw;
 use crate::thread;
-use crate::SpdkBdevIO;
 
 use std::ffi::{c_void, CStr, CString};
-use std::marker;
 use std::ptr;
 
 use failure::Error;
 
-use futures_new::channel::mpsc;
 use futures_new::channel::oneshot;
 use futures_new::channel::oneshot::Sender;
 
@@ -247,9 +244,9 @@ pub async fn read<'a>(
     nbytes: u64,
 ) -> Result<(), Error> {
     let (sender, receiver) = oneshot::channel();
-    let ret: i32;
+
     unsafe {
-        ret = raw::spdk_bdev_read(
+        raw::spdk_bdev_read(
             desc.raw,
             ch.to_raw(),
             buf.to_raw(),
@@ -281,7 +278,7 @@ pub fn has_write_cache(bdev: SpdkBdev) -> bool {
 
 impl SpdkBdev {
     pub fn from_raw(raw: *mut raw::spdk_bdev) -> SpdkBdev {
-        unsafe { SpdkBdev { raw: raw } }
+        SpdkBdev { raw: raw }
     }
 
     pub fn name(&self) -> &str {
@@ -312,7 +309,7 @@ impl SpdkBdevDesc {
     }
 
     pub fn from_raw(raw: *mut raw::spdk_bdev_desc) -> SpdkBdevDesc {
-        unsafe { SpdkBdevDesc { raw: raw } }
+        SpdkBdevDesc { raw: raw }
     }
 
     pub fn to_raw(&self) -> *mut raw::spdk_bdev_desc {
@@ -336,6 +333,7 @@ fn cb_arg<T>(sender: Sender<Result<T, i32>>) -> *mut c_void {
     Box::into_raw(Box::new(sender)) as *const _ as *mut c_void
 }
 
+#[allow(unused_variables)]
 extern "C" fn spdk_bdev_io_completion_cb(
     bdev_io: *mut raw::spdk_bdev_io,
     success: bool,

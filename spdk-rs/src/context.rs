@@ -1,26 +1,26 @@
 /*************************************************************************
-  > File Name:       context.rs
-  > Author:          Zeyuan Hu
-  > Mail:            iamzeyuanhu@utexas.edu
-  > Created Time:    10/10/18
-  > Description:
-    
-    An abstraction of the context that is needed for the SPDK framework.
-    This file is not part of the original spdk C API. I implement this
-    because I forsee any SPDK-based application may need to define the context struct.
+ > File Name:       context.rs
+ > Author:          Zeyuan Hu
+ > Mail:            iamzeyuanhu@utexas.edu
+ > Created Time:    10/10/18
+ > Description:
 
- ************************************************************************/
+   An abstraction of the context that is needed for the SPDK framework.
+   This file is not part of the original spdk C API. I implement this
+   because I forsee any SPDK-based application may need to define the context struct.
 
+************************************************************************/
+
+use crate::bdev;
 use crate::raw;
+use crate::thread;
+use crate::Buf;
 use crate::SpdkBdev;
 use crate::SpdkBdevDesc;
 use crate::SpdkBdevIO;
-use crate::Buf;
-use crate::bdev;
-use crate::thread;
 
-use std::ffi::{CString, CStr};
-use std::os::raw::{c_void, c_char, c_int};
+use std::ffi::{CStr, CString};
+use std::os::raw::{c_char, c_void};
 use std::ptr;
 
 use failure::Error;
@@ -39,12 +39,12 @@ pub struct AppContext {
 
 impl Clone for AppContext {
     fn clone(&self) -> AppContext {
-        AppContext{
+        AppContext {
             bdev: self.bdev,
-            bdev_desc : self.bdev_desc,
+            bdev_desc: self.bdev_desc,
             bdev_io_channel: self.bdev_io_channel,
             buff: self.buff,
-            bdev_name: self.bdev_name
+            bdev_name: self.bdev_name,
         }
     }
 }
@@ -94,11 +94,9 @@ impl AppContext {
         }
         let bdev = bdev::get_by_name(str_slice);
         match bdev {
-            Err(E) => {
-                Err(E)?
-            }
-            Ok(T) => {
-                self.bdev = T.to_raw();
+            Err(e) => Err(e)?,
+            Ok(t) => {
+                self.bdev = t.to_raw();
                 Ok(())
             }
         }
@@ -131,33 +129,25 @@ impl AppContext {
     }
 
     pub fn spdk_bdev_put_io_channel(&self) {
-        unsafe {
-            raw::spdk_put_io_channel(self.bdev_io_channel)
-        }
+        unsafe { raw::spdk_put_io_channel(self.bdev_io_channel) }
     }
 
-    //    pub fn spdk_bdev_write<F>(&mut self, offset: u64, cb: F) -> Result<i32, String>
-//        where
-//            F: FnMut(*mut raw::spdk_bdev_io, bool) -> () {
-//        let ret = SpdkBdev::spdk_bdev_write(SpdkBdevDesc::from_raw(self.bdev_desc),
-//                                            SpdkIoChannel::from_raw(self.bdev_io_channel),
-//                                            Buf::from_raw(self.buff as *mut c_void),
-//                                            offset,
-//                                            unsafe {raw::spdk_bdev_get_block_size(self.bdev) as u64},
-//                                            cb,
-//        );
-//        ret
-//    }
-    unsafe extern "C" fn spdk_bdev_io_completion_cb<F>(bdev_io: *mut raw::spdk_bdev_io, success: bool, cb_arg: *mut c_void) where
-        F: FnMut() -> ()
+    #[allow(unused_variables)]
+    unsafe extern "C" fn spdk_bdev_io_completion_cb<F>(
+        bdev_io: *mut raw::spdk_bdev_io,
+        success: bool,
+        cb_arg: *mut c_void,
+    ) where
+        F: FnMut() -> (),
     {
         let opt_closure = cb_arg as *mut F;
-        unsafe { (*opt_closure)() }
+        (*opt_closure)()
     }
 
-
     pub fn spdk_bdev_write<F>(&self, offset: u64, cb: F) -> Result<i32, String>
-        where F: FnMut() -> () {
+    where
+        F: FnMut() -> (),
+    {
         let callback = Box::new(cb);
         let ret = unsafe {
             raw::spdk_bdev_write(
@@ -165,7 +155,7 @@ impl AppContext {
                 self.bdev_io_channel,
                 self.buff as *mut c_void,
                 offset,
-                unsafe { raw::spdk_bdev_get_block_size(self.bdev) as u64 },
+                raw::spdk_bdev_get_block_size(self.bdev) as u64,
                 Some(AppContext::spdk_bdev_io_completion_cb::<F>),
                 &*callback as *const _ as *mut c_void,
             )
@@ -173,26 +163,23 @@ impl AppContext {
         std::mem::forget(callback);
         match ret == 0 {
             true => Ok(0),
-            false => {
-                Result::Err(format!("Could not write to the device"))
-            }
+            false => Result::Err(format!("Could not write to the device")),
         }
     }
 
-
     pub fn allocate_buff(&mut self) -> Result<i32, String> {
         unsafe {
-            self.buff = raw::spdk_dma_zmalloc(raw::spdk_bdev_get_block_size(self.bdev) as usize,
-                                              raw::spdk_bdev_get_buf_align(self.bdev),
-                                              ptr::null_mut()) as *mut c_char;
+            self.buff = raw::spdk_dma_zmalloc(
+                raw::spdk_bdev_get_block_size(self.bdev) as usize,
+                raw::spdk_bdev_get_buf_align(self.bdev),
+                ptr::null_mut(),
+            ) as *mut c_char;
             match self.buff.is_null() {
                 true => {
                     let s = format!("Failed to allocate buffer");
                     Err(s)
                 }
-                false => {
-                    Ok(0)
-                }
+                false => Ok(0),
             }
         }
     }
@@ -213,7 +200,12 @@ impl AppContext {
         let owned_content = CString::new(message).unwrap();
         let content: *const c_char = owned_content.as_ptr();
         unsafe {
-            raw::snprintf(self.buff, raw::spdk_bdev_get_block_size(self.bdev) as usize, fmt, content);
+            raw::snprintf(
+                self.buff,
+                raw::spdk_bdev_get_block_size(self.bdev) as usize,
+                fmt,
+                content,
+            );
         }
     }
 }
