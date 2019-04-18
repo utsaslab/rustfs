@@ -1,44 +1,31 @@
-/*************************************************************************
- > File Name:       language.rs
- > Author:          Zeyuan Hu
- > Mail:            iamzeyuanhu@utexas.edu
- > Created Time:    12/15/18
- > Description:
-
-   Benchmark:
-
-   1. Sequential write throughput for Rust + SPDK vs. dd
-   2. Random write latency for Rust + SPDK vs. dd
-************************************************************************/
-
+/// Benchmark:
+/// 1. Sequential write throughput for Rust + SPDK vs. dd on SSD
+/// 2. Random write latency for Rust + SPDK vs. dd on SSD
 use colored::*;
 use env_logger::Builder;
 use failure::Error;
-use futures;
-use sha2::{Digest, Sha256};
 use std::env;
 use std::fs;
 use std::fs::OpenOptions;
-use std::io;
 use std::io::prelude::*;
 use std::io::Write;
 use std::mem;
 use std::path::Path;
 use std::process;
-use std::thread;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 use toml::Value;
 use utils_rustfs;
 
+/// Display the usage of the language.rs
 fn usage() {}
 
 /// Use `dd` to benchmark the throughput for sequential write
 fn dd_seq() {
     let dict = parse_config().unwrap();
 
-    let mut of_path = utils_rustfs::strip(dict["common"]["SSD_PATH"].to_string());
+    let of_path = utils_rustfs::strip(dict["common"]["SSD_PATH"].to_string());
     let of_path = [of_path, String::from("testfile")].join("/");
-    let mut bs = utils_rustfs::strip(dict["sequential_write"]["BS"].to_string());
+    let bs = utils_rustfs::strip(dict["sequential_write"]["BS"].to_string());
     let count = dict["sequential_write"]["COUNT"].to_string();
     let oflag = utils_rustfs::strip(dict["sequential_write"]["oflag"].to_string());
 
@@ -80,7 +67,7 @@ fn dd_seq() {
     // e.g., 723
     let throughput = v2_string[1];
 
-    println!("Throughput: {:} MB/s", v2_string[1]);
+    println!("Throughput: {:} MB/s", throughput);
     assert!(output.status.success());
 }
 
@@ -89,12 +76,12 @@ async fn run(poller: spdk_rs::io_channel::PollerHandle, _test_path_enabled: bool
         Ok(_) => println!("Successful"),
         Err(err) => println!("Failure: {:?}", err),
     }
-    if _test_path_enabled {
-        match await!(run_inner_check2()) {
-            Ok(_) => println!("Successful"),
-            Err(err) => println!("Failure: {:?}", err),
-        }
-    }
+    // if _test_path_enabled {
+    //     match await!(run_inner_check2()) {
+    //         Ok(_) => println!("Successful"),
+    //         Err(err) => println!("Failure: {:?}", err),
+    //     }
+    // }
     spdk_rs::event::app_stop(true);
 }
 
@@ -401,7 +388,11 @@ pub fn main() {
     Builder::new()
         .parse(&env::var("RUSTFS_BENCHMARKS_LANGUAGE_LOG").unwrap_or_default())
         .init();
+    let args: Vec<String> = env::args().collect();
+    let bench_type = &args[1];
 
-    //dd_seq();
-    rust_seq(run, false);
+    if bench_type == "dd" {
+        dd_seq();
+    }
+    //rust_seq(run, false);
 }

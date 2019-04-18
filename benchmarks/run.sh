@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# All commands should be run with `sudo`
+
 source $HOME/.cargo/env
 export RUST_BACKTRACE=1
 
@@ -20,7 +22,9 @@ elif [ "$1" = "test" ]; then
     rm -rf checksum_new.txt
     rm -rf checksum_origin.txt
     cargo test -- --nocapture
-    cargo test -- --nocapture
+    #cargo test -- --nocapture
+elif [ "$1" = "dd" ]; then
+    cargo run dd
 else
     cargo run
 fi
