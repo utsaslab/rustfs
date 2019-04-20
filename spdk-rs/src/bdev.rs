@@ -157,6 +157,7 @@ pub async fn write<'a>(
             Some(spdk_bdev_io_completion_cb),
             cb_arg::<()>(sender),
         );
+        debug!("ret: {}", ret);
     };
     assert!(ret == 0);
     // TODO: we probably need to handle the case where ret != 0

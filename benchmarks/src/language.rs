@@ -136,8 +136,8 @@ async fn run_inner() -> Result<(), Error> {
     let bs = utils_rustfs::convert(num_int.to_string().as_str(), unit.as_str(), "B");
     debug!("bs: {}", bs);
 
-    let ret = spdk_rs::bdev::get_by_name("Malloc0");
-    //let ret = spdk_rs::bdev::get_by_name("Nvme0n1");
+    //let ret = spdk_rs::bdev::get_by_name("Malloc0");
+    let ret = spdk_rs::bdev::get_by_name("Nvme0n1");
     let bdev = ret.unwrap();
     let mut desc = spdk_rs::bdev::SpdkBdevDesc::new();
 
