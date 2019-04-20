@@ -16,9 +16,9 @@ use std::ffi::{c_void, CStr, CString};
 use std::ptr;
 
 use failure::Error;
-
 use futures_new::channel::oneshot;
 use futures_new::channel::oneshot::Sender;
+use std::io;
 
 #[derive(Debug, Fail)]
 pub enum BdevError {
@@ -146,7 +146,7 @@ pub async fn write<'a>(
     nbytes: u64,
 ) -> Result<(), Error> {
     let (sender, receiver) = oneshot::channel();
-    let ret: i32;
+    let mut ret: i32;
     unsafe {
         ret = raw::spdk_bdev_write(
             desc.raw,
@@ -157,7 +157,11 @@ pub async fn write<'a>(
             Some(spdk_bdev_io_completion_cb),
             cb_arg::<()>(sender),
         );
-        debug!("ret: {}", ret);
+        if ret != 0 {
+            ret = ret * -1;
+            let error = io::Error::from_raw_os_error(ret);
+            println!("{:?}", error);
+        }
     };
     assert!(ret == 0);
     // TODO: we probably need to handle the case where ret != 0
