@@ -318,7 +318,7 @@ fn forget_rc(task_handle: Rc<TaskHandle>) {
 mod tests {
 
     use super::*;
-    use futures::task::Poll;
+    use futures_new::task::Poll;
     use hamcrest2::prelude::*;
 
     type PollerFn = dyn Fn(&LocalWaker, &mut Controller) -> Poll<()>;

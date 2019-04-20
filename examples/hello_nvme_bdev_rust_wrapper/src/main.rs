@@ -29,13 +29,6 @@ use failure::Error;
 use std::env;
 use std::mem;
 
-#[macro_export]
-macro_rules! getLine {
- ($($msg : expr)*) => {
-    println!("[DEBUG] Execution hit line: {}", line!());
- }
-}
-
 async fn run(poller: spdk_rs::io_channel::PollerHandle) {
     match await!(run_inner()) {
             Ok(_) => println!("Successful"),
