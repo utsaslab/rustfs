@@ -12,6 +12,8 @@ export RUSTFLAGS="-C link-arg=$SPDK_INSTALL_DIR/lib/libspdk.so"
 # Logging level
 export RUSTFS_BENCHMARKS_LANGUAGE_LOG=debug
 
+# Whether to use memory (e.g., Malloc0) instead of NVMe disk for the benchmark
+export MALLOC0=0
 
 if [ "$1" =  "clean" ]; then
     cargo clean
