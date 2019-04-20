@@ -16,6 +16,33 @@ use std::time::Instant;
 use toml::Value;
 use utils_rustfs;
 
+pub fn main() {
+    Builder::new()
+        .parse(&env::var("RUSTFS_BENCHMARKS_LANGUAGE_LOG").unwrap_or_default())
+        .init();
+    let args: Vec<String> = env::args().collect();
+    let is_throughput = &args[1];
+    let is_rust = &args[2];
+
+    if is_throughput == "1" {
+        if is_rust == "1" {
+            rust_seq(run);
+        } else {
+            dd_seq();
+        }
+    }
+}
+
+/// parse the configuration file "language.toml"
+fn parse_config() -> Result<toml::Value, Error> {
+    let contents =
+        fs::read_to_string("config/language.toml").expect("Something went wrong reading the file");
+
+    let value = contents.parse::<Value>().unwrap();
+
+    Ok(value)
+}
+
 /// Display the usage of the language.rs
 fn usage() {}
 
@@ -71,33 +98,22 @@ fn dd_seq() {
     assert!(output.status.success());
 }
 
-async fn run(poller: spdk_rs::io_channel::PollerHandle, _test_path_enabled: bool) {
-    match await!(run_inner(_test_path_enabled)) {
+async fn run(poller: spdk_rs::io_channel::PollerHandle) {
+    match await!(run_inner()) {
         Ok(_) => println!("Successful"),
         Err(err) => println!("Failure: {:?}", err),
     }
-    // if _test_path_enabled {
-    //     match await!(run_inner_check2()) {
-    //         Ok(_) => println!("Successful"),
-    //         Err(err) => println!("Failure: {:?}", err),
-    //     }
-    // }
     spdk_rs::event::app_stop(true);
 }
 
-async fn run_inner(_test_path_enabled: bool) -> Result<(), Error> {
+async fn run_inner() -> Result<(), Error> {
     let dict = parse_config().unwrap();
 
     let mut bs = String::new();
     let mut count = String::new();
 
-    if _test_path_enabled {
-        bs = utils_rustfs::strip(dict["sequential_write_test"]["BS"].to_string());
-        count = String::from("1");
-    } else {
-        bs = utils_rustfs::strip(dict["sequential_write"]["BS"].to_string());
-        count = dict["sequential_write"]["COUNT"].to_string();
-    }
+    bs = utils_rustfs::strip(dict["sequential_write"]["BS"].to_string());
+    count = dict["sequential_write"]["COUNT"].to_string();
 
     // let's first calculate how much we should write to the device
     let mut num = String::from("");
@@ -192,28 +208,6 @@ async fn run_inner(_test_path_enabled: bool) -> Result<(), Error> {
         utils_rustfs::convert(throughput.to_string().as_str(), "B", "MB")
     );
 
-    if _test_path_enabled {
-        print!("{}", "Correctness check 1".green());
-        let mut read_buf = spdk_rs::env::dma_zmalloc(write_buf_size, buf_align);
-        for i in 0..num_chunks {
-            match await!(spdk_rs::bdev::read(
-                desc.clone(),
-                &io_channel,
-                &mut read_buf,
-                (i * write_buf_size) as u64,
-                write_buf_size as u64
-            )) {
-                Ok(_) => {
-                    let read_buf_string = read_buf.read().to_string();
-                    assert_eq!(read_buf_string.len(), write_buf_size);
-                    assert!("A".repeat(write_buf_size) == read_buf.read().to_string());
-                }
-                Err(error) => panic!("{:}", error),
-            }
-        }
-        println!("{}", " ... ok".green());
-    }
-
     spdk_rs::thread::put_io_channel(io_channel);
     spdk_rs::bdev::close(desc);
     spdk_rs::event::app_stop(true);
@@ -224,10 +218,9 @@ async fn run_inner(_test_path_enabled: bool) -> Result<(), Error> {
 /// and calculate the throughput
 fn rust_seq<
     G: std::future::Future<Output = ()> + 'static,
-    F: Fn(spdk_rs::io_channel::PollerHandle, bool) -> G,
+    F: Fn(spdk_rs::io_channel::PollerHandle) -> G,
 >(
     async_fn: F,
-    _test_path_enabled: bool,
 ) {
     let config_file = Path::new("config/bdev.conf").canonicalize().unwrap();
     let mut opts = spdk_rs::event::SpdkAppOpts::new();
@@ -240,159 +233,8 @@ fn rust_seq<
         mem::forget(executor);
 
         let poller = spdk_rs::io_channel::poller_register(spdk_rs::executor::pure_poll);
-        spdk_rs::executor::spawn(async_fn(poller, _test_path_enabled));
+        spdk_rs::executor::spawn(async_fn(poller));
     });
 
     println!("Successfully shutdown SPDK framework");
-}
-
-async fn run_inner_check2() -> Result<(), Error> {
-    print!("{}", "Correctness check 2".green());
-
-    // For simplicity, file_size should be multiple of 1MB
-    let num_chunks = 1;
-    //let write_buf_size = utils_rustfs::constant::MEGABYTE;
-    let write_buf_size = utils_rustfs::constant::BYTE * 1024;
-    let file_size = write_buf_size * num_chunks;
-
-    // We first generate a large random file
-    let filename = "run_inner_check2_test_file_origin.txt";
-    let mut output = fs::File::create(filename)?;
-    let mut file = OpenOptions::new().append(true).open(filename).unwrap();
-
-    // We write the file to the disk using SPDK
-    let ret = spdk_rs::bdev::get_by_name("Nvme0n1");
-    let bdev = ret.unwrap();
-    let mut desc = spdk_rs::bdev::SpdkBdevDesc::new();
-
-    match spdk_rs::bdev::open(bdev.clone(), true, &mut desc) {
-        Ok(_) => println!("Successfully open the device {}", bdev.name()),
-        _ => {}
-    };
-    let io_channel = spdk_rs::bdev::get_io_channel(desc.clone())?;
-    let blk_size = spdk_rs::bdev::get_block_size(bdev.clone());
-    let buf_align = spdk_rs::bdev::get_buf_align(bdev.clone());
-
-    let mut buffer_vec = Vec::new();
-    for i in 0..num_chunks {
-        let mut write_buf = spdk_rs::env::dma_zmalloc(write_buf_size, buf_align);
-        let rand_string = utils_rustfs::generate_string_alpha(write_buf_size);
-        write_buf.fill(write_buf_size, "%s", &rand_string);
-        write!(file, "{}", rand_string)?;
-        buffer_vec.push(write_buf);
-    }
-
-    for i in 0..num_chunks {
-        utils_rustfs::getLine!();
-        match await!(spdk_rs::bdev::write(
-            desc.clone(),
-            &io_channel,
-            &buffer_vec[i],
-            (i * write_buf_size) as u64,
-            write_buf_size as u64
-        )) {
-            Ok(_) => {}
-            Err(error) => panic!("{:?}", error),
-        }
-    }
-
-    // Let's see part of what we have written
-    println!("{}", "Let's see what we have written".yellow());
-    let mut read_buf = spdk_rs::env::dma_zmalloc(write_buf_size, buf_align);
-    for i in 0..1 {
-        match await!(spdk_rs::bdev::read(
-            desc.clone(),
-            &io_channel,
-            &mut read_buf,
-            (i * write_buf_size) as u64,
-            write_buf_size as u64
-        )) {
-            Ok(_) => println!("we have written (part of): {}", read_buf.read()),
-            Err(error) => panic!("{:}", error),
-        }
-    }
-
-    // We calculate the check sum of the large random file and save it to the disk.
-    // Next time, we check whether such file exists, if so, we read content from disk
-    // into another file and compare the checksum.
-    // The block can possible be modified between two runs. Thus, we use `run.sh` call
-    // `cargo test` twice and ensure there is no others run the same program. In other words, please
-    // don't touch SPDK during the test.
-    let checksum_filename = "checksum_origin.txt";
-    if !Path::new(checksum_filename).exists() {
-        debug!("{} not exists!", checksum_filename.yellow());
-        utils_rustfs::get_checksum(filename, checksum_filename);
-    } else {
-        let checksum_filename_new = "checksum_new.txt";
-        let filename_new = "run_inner_check2_test_file_new.txt";
-        let mut read_buf = spdk_rs::env::dma_zmalloc(write_buf_size, buf_align);
-        for i in 0..num_chunks {
-            match await!(spdk_rs::bdev::read(
-                desc.clone(),
-                &io_channel,
-                &mut read_buf,
-                (i * write_buf_size) as u64,
-                write_buf_size as u64
-            )) {
-                Ok(_) => {
-                    // We write the read_buf content into the file
-                    let mut file_new = fs::File::create(filename_new)?;
-                    file_new = OpenOptions::new().append(true).open(filename_new)?;
-                    write!(&mut file_new, "{}", read_buf.read());
-                }
-                Err(error) => panic!("{:}", error),
-            }
-        }
-        // Let's calculate the new checksum
-        utils_rustfs::get_checksum(filename_new, checksum_filename_new)?;
-        // Let's compare the checksum
-        let mut file = fs::File::open(checksum_filename)?;
-        let mut checksum_origin = String::new();
-        file.read_to_string(&mut checksum_origin);
-        file = fs::File::open(checksum_filename_new)?;
-        let mut checksum_new = String::new();
-        file.read_to_string(&mut checksum_new);
-        assert_eq!(checksum_origin, checksum_new);
-        println!("{}", " ... ok".green());
-    }
-
-    Ok(())
-}
-
-/// Test the Rust + SPDK sequential write correctness
-/// We perform the following two checks:
-/// 1. Once the write is finished, we immediately read from the disk and see if the read content and write content are exactly the same.
-/// 2. a) Generate a big random file b) we write the file to the disk using SPDK c) we reset the driver and shutdown SPDK framework
-///    d) We setup the driver and start the SPDK framework again e) we read the content from disk to another file f) we compare sha256 checksums of the two files
-#[test]
-fn rust_seq_test() {
-    Builder::new()
-        .parse(&env::var("RUSTFS_BENCHMARKS_LANGUAGE_LOG").unwrap_or_default())
-        .init();
-
-    // Perform check 1 and check 2
-    rust_seq(run, true);
-}
-
-/// parse the configuration file "language.toml"
-fn parse_config() -> Result<toml::Value, Error> {
-    let contents =
-        fs::read_to_string("config/language.toml").expect("Something went wrong reading the file");
-
-    let value = contents.parse::<Value>().unwrap();
-
-    Ok(value)
-}
-
-pub fn main() {
-    Builder::new()
-        .parse(&env::var("RUSTFS_BENCHMARKS_LANGUAGE_LOG").unwrap_or_default())
-        .init();
-    let args: Vec<String> = env::args().collect();
-    let bench_type = &args[1];
-
-    if bench_type == "dd" {
-        dd_seq();
-    }
-    //rust_seq(run, false);
 }
