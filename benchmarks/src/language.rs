@@ -6,9 +6,6 @@ use env_logger::Builder;
 use failure::Error;
 use std::env;
 use std::fs;
-use std::fs::OpenOptions;
-use std::io::prelude::*;
-use std::io::Write;
 use std::mem;
 use std::path::Path;
 use std::process;
@@ -43,6 +40,7 @@ fn parse_config() -> Result<toml::Value, Error> {
     Ok(value)
 }
 
+#[allow(dead_code)]
 /// Display the usage of the language.rs
 fn usage() {}
 
@@ -98,6 +96,7 @@ fn dd_seq() {
     assert!(output.status.success());
 }
 
+#[allow(unused_variables)]
 async fn run(poller: spdk_rs::io_channel::PollerHandle) {
     match await!(run_inner()) {
         Ok(_) => println!("Successful"),
@@ -109,11 +108,8 @@ async fn run(poller: spdk_rs::io_channel::PollerHandle) {
 async fn run_inner() -> Result<(), Error> {
     let dict = parse_config().unwrap();
 
-    let mut bs = String::new();
-    let mut count = String::new();
-
-    bs = utils_rustfs::strip(dict["sequential_write"]["BS"].to_string());
-    count = dict["sequential_write"]["COUNT"].to_string();
+    let bs = utils_rustfs::strip(dict["sequential_write"]["BS"].to_string());
+    let count = dict["sequential_write"]["COUNT"].to_string();
 
     // let's first calculate how much we should write to the device
     let mut num = String::from("");
@@ -175,7 +171,7 @@ async fn run_inner() -> Result<(), Error> {
 
     // we want to prepare a vector of buffers with random content
     let mut buffer_vec = Vec::new();
-    for i in 0..num_chunks {
+    for _ in 0..num_chunks {
         // +1 for null terminator due to `snprintf` in `fill` implementation
         let mut write_buf = spdk_rs::env::dma_zmalloc(write_buf_size + 1, buf_align);
         let fixed_string = utils_rustfs::generate_string_fixed(write_buf_size);
@@ -209,8 +205,9 @@ async fn run_inner() -> Result<(), Error> {
     debug!("throughput: {} byte/s", throughput);
 
     println!(
-        "throughput: {} MB/s",
-        utils_rustfs::convert(throughput.to_string().as_str(), "B", "MB")
+        "{}: {} MB/s",
+        "throughput".blue().bold(),
+        utils_rustfs::convert(throughput.to_string().as_str(), "B", "MB").green()
     );
 
     spdk_rs::thread::put_io_channel(io_channel);
