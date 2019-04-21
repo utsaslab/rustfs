@@ -16,3 +16,4 @@ gdb.txt
 core
 GPATH
 GTAGS
+*.swp

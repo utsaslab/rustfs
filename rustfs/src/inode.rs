@@ -39,6 +39,7 @@ pub fn create_tlist<T>() -> TList<T> {
 }
 
 pub struct Inode {
+    fs: &FS,
     single: EntryList, // Box<([Option<Page>, ..256])>
     double: DoubleEntryList, // Box<[Option<Box<([Option<Page>>, ..256])>, ..256]
     size: usize,
@@ -49,12 +50,13 @@ pub struct Inode {
 }
 
 impl Inode {
-    pub fn new() -> Inode {
+    pub fn new(fs: &FS) -> Inode {
         // NOTE: here we show how to use spdk_rs
         let opts : raw::spdk_app_opts;
         let time_now = time::get_time();
 
         Inode {
+            fs: fs,
             single: create_tlist(),
             double: create_tlist(),
             size: 0,
@@ -65,7 +67,11 @@ impl Inode {
         }
     }
 
-    fn get_or_alloc_page<'a>(&'a mut self, num: usize) -> &'a mut Page {
+    pub fn size(){
+        
+    }
+
+    fn get_or_alloc_page<'a>(&'a mut self, num: usize) -> usize {
         if num >= LIST_SIZE + LIST_SIZE * LIST_SIZE {
             panic!("Maximum file size exceeded!")
         };
@@ -91,7 +97,8 @@ impl Inode {
         };
 
         match *page {
-            None => *page = Some(Box::new([0u8; 4096])),
+            None => { let block_idx = &mut self.alloc_block;}
+//            None => *page = Some(Box::new([0u8; 4096])),
             _ => { /* Do Nothing */ }
         }
 
