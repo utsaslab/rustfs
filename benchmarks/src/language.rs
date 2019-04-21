@@ -42,7 +42,9 @@ fn parse_config() -> Result<toml::Value, Error> {
 
 #[allow(dead_code)]
 /// Display the usage of the language.rs
-fn usage() {}
+fn usage() {
+    unimplemented!();
+}
 
 /// Use `dd` to benchmark the throughput for sequential write
 fn dd_seq() {
@@ -132,13 +134,18 @@ async fn run_inner() -> Result<(), Error> {
     let bs = utils_rustfs::convert(num_int.to_string().as_str(), unit.as_str(), "B");
     debug!("bs: {}", bs);
 
-    let malloc0 = env::var("MALLOC0").is_err();
     let ret;
-    if malloc0 {
-        ret = spdk_rs::bdev::get_by_name("Malloc0");
-    } else {
-        ret = spdk_rs::bdev::get_by_name("Nvme0n1");
+    match env::var("MALLOC0") {
+        Ok(val) => {
+            debug!("{}: {:?}", "MALLOC0", val);
+            ret = spdk_rs::bdev::get_by_name("Malloc0");
+        }
+        Err(e) => {
+            debug!("couldn't interpret MALLOC0: {}", e);
+            ret = spdk_rs::bdev::get_by_name("Nvme0n1");
+        }
     }
+
     let bdev = ret.unwrap();
     let mut desc = spdk_rs::bdev::SpdkBdevDesc::new();
 
@@ -240,3 +247,7 @@ fn rust_seq<
 
     println!("Successfully shutdown SPDK framework");
 }
+
+/// Use the SPDK framework to randomly write 4K blocks on SSD for a number of times (e.g., 10K)
+/// and measure write latency
+pub fn run2() {}
