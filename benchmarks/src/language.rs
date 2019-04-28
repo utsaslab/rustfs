@@ -13,6 +13,12 @@ use std::time::Instant;
 use toml::Value;
 use utils_rustfs;
 
+#[derive(Clone)]
+enum BenchmarkType {
+    SeqWrite,
+    RandLatency,
+}
+
 pub fn main() {
     Builder::new()
         .parse(&env::var("RUSTFS_BENCHMARKS_LANGUAGE_LOG").unwrap_or_default())
@@ -22,10 +28,18 @@ pub fn main() {
     let is_rust = &args[2];
 
     if is_throughput == "1" {
+        // Sequential write test
         if is_rust == "1" {
-            rust_seq(run);
+            driver(run, BenchmarkType::SeqWrite);
         } else {
             dd_seq();
+        }
+    } else if is_throughput == "0" {
+        // Latency write test
+        if is_rust == "1" {
+            driver(run, BenchmarkType::RandLatency);
+        } else {
+            unimplemented!();
         }
     }
 }
@@ -99,15 +113,23 @@ fn dd_seq() {
 }
 
 #[allow(unused_variables)]
-async fn run(poller: spdk_rs::io_channel::PollerHandle) {
-    match await!(run_inner()) {
-        Ok(_) => println!("Successful"),
-        Err(err) => println!("Failure: {:?}", err),
+async fn run(poller: spdk_rs::io_channel::PollerHandle, benchmark_type: BenchmarkType) {
+    match benchmark_type {
+        BenchmarkType::SeqWrite => match await!(sequential_write()) {
+            Ok(_) => println!("Successful"),
+            Err(err) => println!("Failure: {:?}", err),
+        },
+        BenchmarkType::RandLatency => match await!(latency()) {
+            Ok(_) => println!("Successful"),
+            Err(err) => println!("Failure: {:?}", err),
+        },
     }
     spdk_rs::event::app_stop(true);
 }
 
-async fn run_inner() -> Result<(), Error> {
+/// Use the SPDK framework to perform sequential write
+/// and calculate the throughput
+async fn sequential_write() -> Result<(), Error> {
     let dict = parse_config().unwrap();
 
     let bs = utils_rustfs::strip(dict["sequential_write"]["BS"].to_string());
@@ -223,13 +245,12 @@ async fn run_inner() -> Result<(), Error> {
     Ok(())
 }
 
-/// Use the SPDK framework to perform sequential write
-/// and calculate the throughput
-fn rust_seq<
+fn driver<
     G: std::future::Future<Output = ()> + 'static,
-    F: Fn(spdk_rs::io_channel::PollerHandle) -> G,
+    F: Fn(spdk_rs::io_channel::PollerHandle, BenchmarkType) -> G,
 >(
     async_fn: F,
+    benchmark_type: BenchmarkType,
 ) {
     let config_file = Path::new("config/bdev.conf").canonicalize().unwrap();
     let mut opts = spdk_rs::event::SpdkAppOpts::new();
@@ -242,7 +263,7 @@ fn rust_seq<
         mem::forget(executor);
 
         let poller = spdk_rs::io_channel::poller_register(spdk_rs::executor::pure_poll);
-        spdk_rs::executor::spawn(async_fn(poller));
+        spdk_rs::executor::spawn(async_fn(poller, benchmark_type.clone()));
     });
 
     println!("Successfully shutdown SPDK framework");
@@ -250,4 +271,6 @@ fn rust_seq<
 
 /// Use the SPDK framework to randomly write 4K blocks on SSD for a number of times (e.g., 10K)
 /// and measure write latency
-pub fn run2() {}
+async fn latency() -> Result<(), Error> {
+    unimplemented!();
+}

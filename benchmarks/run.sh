@@ -24,10 +24,10 @@ elif [ "$1" = "test" ]; then
     rm -rf checksum_origin.txt
     cargo test -- --nocapture
     #cargo test -- --nocapture
-else
-    if [ "$1" == "dd" ]; then
-        cargo run 1 0
-    else
-        cargo run 1 1
-    fi    
+elif [ "$1" == "dd" ]; then
+    cargo run 1 0
+elif [ "$1" == "seq" ]; then
+    cargo run 1 1
+elif [ "$1" == "rand" ]; then
+    cargo run 0 1
 fi
