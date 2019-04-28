@@ -354,8 +354,16 @@ async fn latency() -> Result<(), Error> {
     // Let's calculate average latency and standard deviation
     println!(
         "{}: {} ms",
-        "Avergae latency".blue().bold(),
+        "Average latency".blue().bold(),
         utils_rustfs::mean(&latency_vec[..])
+            .unwrap()
+            .to_string()
+            .green()
+    );
+    println!(
+        "{}: {} ms",
+        "latency std dev".blue().bold(),
+        utils_rustfs::std_deviation(&latency_vec[..])
             .unwrap()
             .to_string()
             .green()

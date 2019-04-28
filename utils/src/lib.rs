@@ -223,6 +223,31 @@ where
     }
 }
 
+/// Calculate sample variance of the given data
+pub fn variance(data: &[f64]) -> Option<f64> {
+    match data.len() {
+        0 => None,
+        _ => {
+            let mean = mean(data);
+            let mut v: f64 = 0.0;
+            for s in data {
+                let x = s - mean.unwrap();
+                v = v + x * x;
+            }
+            let denom = (data.len() - 1) as f64;
+            Some(v / denom)
+        }
+    }
+}
+
+/// Calculate standard deviation of the given data
+pub fn std_deviation(data: &[f64]) -> Option<f64> {
+    match data.len() {
+        0 => None,
+        _ => Some(variance(data).unwrap().sqrt()),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -343,5 +368,21 @@ mod tests {
         let numbers = [10, -21, 15, 20, 18, 14, 18];
         let err = "Slice is empty.";
         assert_eq!(10.571428571428571, mean(&numbers).expect(err));
+        let numbers2 = [727.7, 1086.5, 1091.0, 1361.3, 1490.5, 1956.1];
+        assert_eq!(1285.5166666666667, mean(&numbers2).expect(err));
+    }
+
+    #[test]
+    fn test_variance() {
+        let numbers = [727.7, 1086.5, 1091.0, 1361.3, 1490.5, 1956.1];
+        let err = "Slice is empty.";
+        assert_eq!(177209.41766666662, variance(&numbers).expect(err));
+    }
+
+    #[test]
+    fn test_std_deviation() {
+        let numbers = [727.7, 1086.5, 1091.0, 1361.3, 1490.5, 1956.1];
+        let err = "Slice is empty.";
+        assert_eq!(420.96248961952256, std_deviation(&numbers).expect(err));
     }
 }
