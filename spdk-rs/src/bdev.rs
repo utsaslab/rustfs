@@ -132,6 +132,11 @@ pub fn get_block_size(bdev: SpdkBdev) -> u32 {
     unsafe { raw::spdk_bdev_get_block_size(bdev.to_raw()) }
 }
 
+/// spdk_bdev_get_num_blocks()
+pub fn get_num_blocks(bdev: SpdkBdev) -> u64 {
+    unsafe { raw::spdk_bdev_get_num_blocks(bdev.to_raw()) }
+}
+
 /// spdk_bdev_get_buf_align()
 pub fn get_buf_align(bdev: SpdkBdev) -> usize {
     unsafe { raw::spdk_bdev_get_buf_align(bdev.to_raw()) }

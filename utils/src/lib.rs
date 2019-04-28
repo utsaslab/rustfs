@@ -7,9 +7,11 @@ extern crate env_logger;
 extern crate failure;
 extern crate hex_literal;
 extern crate log;
+extern crate num;
 extern crate rand;
 
 use failure::Error;
+use num::{FromPrimitive, ToPrimitive};
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
 use sha2::{Digest, Sha256};
@@ -18,6 +20,7 @@ use std::fs;
 use std::io;
 use std::io::prelude::*;
 use std::io::Write;
+use std::iter::Sum;
 use std::os::raw::{c_char, c_int};
 use std::str;
 use std::time::Duration;
@@ -205,6 +208,21 @@ pub fn error_string(errno: i32) -> String {
     }
 }
 
+/// Calculate mean of the given data
+pub fn mean<'a, T: 'a>(numbers: &'a [T]) -> Option<f64>
+where
+    T: ToPrimitive + Sum<&'a T>,
+{
+    match numbers.len() {
+        0 => None,
+        _ => {
+            let sum = numbers.iter().sum::<T>();
+            FromPrimitive::from_usize(numbers.len())
+                .and_then(|length: f64| T::to_f64(&sum).and_then(|val| Some(val / length)))
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -318,5 +336,12 @@ mod tests {
                 "No such file or directory"
             );
         }
+    }
+
+    #[test]
+    fn test_mean() {
+        let numbers = [10, -21, 15, 20, 18, 14, 18];
+        let err = "Slice is empty.";
+        assert_eq!(10.571428571428571, mean(&numbers).expect(err));
     }
 }
