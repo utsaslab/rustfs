@@ -160,7 +160,11 @@ async fn sequential_write() -> Result<(), Error> {
     match env::var("MALLOC0") {
         Ok(val) => {
             debug!("{}: {:?}", "MALLOC0", val);
-            ret = spdk_rs::bdev::get_by_name("Malloc0");
+            if val == "1" {
+                ret = spdk_rs::bdev::get_by_name("Malloc0");
+            } else {
+                ret = spdk_rs::bdev::get_by_name("Nvme0n1");
+            }
         }
         Err(e) => {
             debug!("couldn't interpret MALLOC0: {}", e);
