@@ -1,21 +1,11 @@
-/*************************************************************************
- > File Name:       env.rs
- > Author:          Zeyuan Hu
- > Mail:            iamzeyuanhu@utexas.edu
- > Created Time:    10/10/18
- > Description:
-
-   FFI for "env.h". This file also contains some helper functions that work with
-   the Buf.
-
-************************************************************************/
-
+//! FFI for "env.h". This file also contains some helper functions that work with
+//! the Buf.
 use crate::raw;
 use std::ffi::{c_void, CStr, CString};
 use std::fs;
-
 use std::os::raw::c_char;
 use std::ptr;
+use std::slice;
 
 #[derive(Clone)]
 pub struct Buf {
@@ -43,6 +33,25 @@ impl Buf {
         unsafe {
             raw::snprintf(self.to_raw() as *mut i8, size, fmt, content);
         }
+    }
+
+    /// Fill in the buffer with the given bytes vector
+    pub fn fill_bytes(&mut self, content: &[u8]) {
+        let size = content.len();
+        let ptr = content.as_ptr();
+        unsafe {
+            libc::memcpy(
+                self.to_raw() as *mut libc::c_void,
+                ptr as *const libc::c_void,
+                size,
+            );
+        }
+        ()
+    }
+
+    /// Read specified number of bytes from buffer
+    pub fn read_bytes(&self, size: usize) -> &[u8] {
+        unsafe { slice::from_raw_parts(self.to_raw() as *const u8, size) }
     }
 
     /// Fill in the buffer with content from "/dev/urandom" with `size`
@@ -169,13 +178,14 @@ pub fn dma_zmalloc(size: usize, align: usize) -> Buf {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::Write;
     use std::mem;
 
     #[test]
     fn test_fill_fixed() {
         unsafe {
-            let mut buffer_size = 5;
-            let mut buffer = libc::malloc(mem::size_of::<c_char>() * buffer_size);
+            let buffer_size = 5;
+            let buffer = libc::malloc(mem::size_of::<c_char>() * buffer_size);
             let mut buf = Buf::from_raw(buffer as *mut c_void);
             let write_size = buf.fill_fixed(buffer_size, "A");
             assert!(write_size == buffer_size);
@@ -189,16 +199,15 @@ mod tests {
     #[test]
     fn test_fill_from_file() -> std::io::Result<()> {
         let filename = "/tmp/test_fill_from_file.txt";
-        let outname = "/tmp/out.txt";
         let test_string: String = String::from("ABCDEFGHIJKLMN");
         let length = test_string.len();
         assert!(length == 14);
         let mut output = fs::File::create(filename)?;
-        write!(output, "{}", test_string)?;
+        std::write!(output, "{}", test_string)?;
         let buffer_size = 3;
         unsafe {
             for i in 0..length {
-                let mut buffer = libc::malloc(mem::size_of::<c_char>() * buffer_size);
+                let buffer = libc::malloc(mem::size_of::<c_char>() * buffer_size);
                 let mut buf = Buf::from_raw(buffer as *mut c_void);
                 let num_read = buf.fill_from_file(filename, i * buffer_size, buffer_size);
                 for j in 0..num_read as usize {
@@ -211,5 +220,17 @@ mod tests {
             }
         }
         Ok(())
+    }
+
+    #[test]
+    fn test_fill_bytes() {
+        let c_string = CString::new("foo").expect("CString::new failed");
+        let bytes = c_string.into_bytes();
+        unsafe {
+            let buffer = libc::malloc(mem::size_of::<c_char>() * 3);
+            let mut buf = Buf::from_raw(buffer as *mut c_void);
+            buf.fill_bytes(&bytes[..]);
+            assert_eq!(buf.read_bytes(3), [b'f', b'o', b'o']);
+        }
     }
 }
