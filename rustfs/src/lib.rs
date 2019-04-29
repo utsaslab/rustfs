@@ -20,10 +20,13 @@ use std::rc::Rc;
 use std::cell::{RefCell};
 use std::collections::HashMap;
 use directory::DirectoryHandle;
+use fs::FS;
+
 pub use file::Whence;
 pub use inode::Inode;
 
 pub type FileDescriptor = isize;
+pub static mut fs: FS = FS::new();
 
 pub const O_RDONLY: u32 =   (1 << 0);
 pub const O_WRONLY: u32 =   (1 << 1);
@@ -33,15 +36,17 @@ pub const O_APPEND: u32 =   (1 << 4);
 pub const O_CREAT: u32 =    (1 << 5);
 
 pub struct Proc<'r> {
+    fs: &mut FS,
     cwd: File<'r>,
     fd_table: HashMap<FileDescriptor, FileHandle<'r>>,
     fds: Vec<FileDescriptor>
 }
 
 impl<'r> Proc<'r> {
-    pub fn new() -> Proc<'r> {
+    pub fn new(fs:&mut FS) -> Proc<'r> {
         Proc {
-            cwd: File::new_dir(None),
+            fs: FS,
+            cwd: FS::root(),
             fd_table: HashMap::new(),
             fds: (0..(256 - 2)).map(|i| 256 - i).collect(),
         }

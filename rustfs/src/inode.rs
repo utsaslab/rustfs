@@ -17,8 +17,8 @@ use std::mem;
 use std::ptr;
 use std::ptr::copy_nonoverlapping;
 
-const PAGE_SIZE: usize = 4096;
-const LIST_SIZE: usize = 256;
+const PAGE_SIZE: usize = 512;
+const LIST_SIZE: usize = 16;
 
 type Page = Box<([u8; PAGE_SIZE])>;
 type Entry = Page;
@@ -40,88 +40,119 @@ pub fn create_tlist<T>() -> TList<T> {
 
 pub struct Inode {
     fs: &FS,
-    single: EntryList, // Box<([Option<Page>, ..256])>
-    double: DoubleEntryList, // Box<[Option<Box<([Option<Page>>, ..256])>, ..256]
+    inum: usize,
+
+    dirtype: usize,
+//    single_blknum: usize,
+//    double_blknum: usize,
+//    single: EntryList, // Box<([Option<Page>, ..256])>
+//    double: DoubleEntryList, // Box<[Option<Box<([Option<Page>>, ..256])>, ..256]
+    single: Option<usize>,
+    double: Option<usize>,
     size: usize,
 
-    mod_time: Timespec,
-    access_time: Timespec,
-    create_time: Timespec,
+//    mod_time: Timespec,
+//    access_time: Timespec,
+//    create_time: Timespec,
+}
+
+impl ToString for Inode{
+    fn to_string(&self) -> String{
+        
+    }
 }
 
 impl Inode {
-    pub fn new(fs: &FS) -> Inode {
+    pub fn new(fs: &FS, dirtype: usize, inum: usize) -> Inode {
         // NOTE: here we show how to use spdk_rs
-        let opts : raw::spdk_app_opts;
-        let time_now = time::get_time();
+        // let opts : raw::spdk_app_opts;
+//        let time_now = time::get_time();
+
+//        let sblk = &mut self.fs.alloc_block();
+//        let dblk = &mut self.fs.alloc_block();
 
         Inode {
             fs: fs,
-            single: create_tlist(),
-            double: create_tlist(),
+            inum: inum,
+            dirtype: dirtype,
+//            single_blknum: sblk,
+//            double_blknum: dblk,
+//            single: create_tlist(),
+//            double: create_tlist(),
+            single: None,
+            double: None,
             size: 0,
 
-            mod_time: time_now,
-            access_time: time_now,
-            create_time: time_now
+//            mod_time: time_now,
+//            access_time: time_now,
+//            create_time: time_now
         }
+        // TODO: write this to disk?
     }
 
-    pub fn size(){
-        
+    fn sync(&self){
+        let offset = &self.inode_base + &self.inum * Inode::size();
+        let blk = offset / BLOCK_SIZE;
+        let blk_offset = offset % BLOCK_SIZE;
+        let mut read_buf = spdk_rs::env::dma_zmalloc(BLOCK_SIZE, 0);
+        &self.fs.device.read(read_buf, blk, BLOCK_SIZE);
+        let mut buf = read_buf.read_bytes(BLOCK_SIZE);
+
+
     }
 
+    pub fn size() -> usize{
+        32
+    }
+
+    // read inode metadata and return block number
     fn get_or_alloc_page<'a>(&'a mut self, num: usize) -> usize {
-        if num >= LIST_SIZE + LIST_SIZE * LIST_SIZE {
+        if num >= LIST_SIZE + 1 {
             panic!("Maximum file size exceeded!")
         };
 
+        bool need_update = false;
+
         // Getting a pointer to the page
-        let page = if num < LIST_SIZE {
-            // if the page num is in the singly-indirect list
-            &mut self.single[num]
+        let page = if num == 0 {
+            if &self.single.is_none() {
+                single = &mut self.fs.alloc_block();
+                need_update = true;
+            }
+            single
         } else {
             // if the page num is in the doubly-indirect list. We allocate a new
             // entry list where necessary (*entry_list = ...)
-            let double_entry = num - LIST_SIZE;
-            let slot = double_entry / LIST_SIZE;
-            let entry_list = &mut self.double[slot];
-
-            match *entry_list {
-                None => *entry_list = Some(create_tlist()),
-                _ => { /* Do nothing */ }
+            let index = num - 1;
+            if &self.double.is_none() {
+                double = &mut self.fs.alloc_block();
+                need_update = true;
             }
 
-            let entry_offset = double_entry % LIST_SIZE;
-            &mut entry_list.as_mut().unwrap()[entry_offset]
+            // TODO: read the indirect block
+            let mut read_buf = spdk_rs::env::dma_zmalloc(BLOCK_SIZE, 0);
+            let entry = Inode::parse_entry(&read_buf.read_bytes(), index);
+
+            entry
         };
 
-        match *page {
-            None => { let block_idx = &mut self.alloc_block;}
-//            None => *page = Some(Box::new([0u8; 4096])),
-            _ => { /* Do Nothing */ }
+        if need_update{
+            &self.sync();
         }
-
-        page.as_mut().unwrap()
+        page
     }
 
-    fn get_page<'a>(&'a self, num: usize) -> &'a Option<Page> {
-        if num >= LIST_SIZE + LIST_SIZE * LIST_SIZE {
+    fn get_page<'a>(&'a self, num: usize) -> usize {
+        if num*PAGE_SIZE >= &self.size {
             panic!("Page does not exist.")
         };
 
-        if num < LIST_SIZE {
-            &self.single[num]
+        if num == 0 {
+            0
         } else {
-            let double_entry = num - LIST_SIZE;
-            let slot = double_entry / LIST_SIZE;
-            let entry_offset = double_entry % LIST_SIZE;
-            let entry_list = &self.double[slot];
+            let index = num - 1;
+            // TODO: read the indirect block
 
-            match *entry_list {
-                None => panic!("Page does not exist."),
-                _ => &entry_list.as_ref().unwrap()[entry_offset]
-            }
         }
     }
 
@@ -155,14 +186,15 @@ impl Inode {
             }
 
             written += num_bytes;
+            // TODO: write page back to device
         }
 
         let last_byte = offset + written;
         if self.size < last_byte { self.size = last_byte; }
 
-        let time_now = time::get_time();
-        self.mod_time = time_now;
-        self.access_time = time_now;
+//        let time_now = time::get_time();
+//        self.mod_time = time_now;
+//        self.access_time = time_now;
 
         written
     }
@@ -185,12 +217,13 @@ impl Inode {
                 PAGE_SIZE - block_offset
             };
 
-            // Finding our block, reading from it
-            let page = match self.get_page(start + i) {
-                &None => panic!("Empty data."),
-                &Some(ref pg) => pg
-            };
-
+            let page = self.get_page(start + i);
+            let offset = page
+            // TODO: read from this block number
+            let mut read_buf = spdk_rs::env::dma_zmalloc(blk_size as usize, buf_align);
+            &self.fs.device.read(&mut read_buf, offset, BLOCK_SIZE);
+            let slice = read_buf.read();
+            
             let slice = &mut data[read..(read + num_bytes)];
             // read += slice.copy_from(page.slice(block_offset,
             // block_offset + num_bytes));

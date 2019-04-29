@@ -47,10 +47,10 @@ impl Device{
                           &mut read_buf, offset, nbytes));
     }
 
-    fn write(&self, write_buf: &mut env::Buf, offset: u64, 
+    fn write(&self, write_buf: &env::Buf, offset: u64, 
              nbytes: u64) -> Result<usize, Error> {
         await!(bdev::write(self.desc.clone(), &self.io_channel, 
-                          &mut write_buf, offset, nbytes));
+                           write_buf, offset, nbytes));
     }
 }
 
