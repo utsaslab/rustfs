@@ -13,7 +13,7 @@ COUNT = 1
 # dd's `dsync`
 oflag = "dsync"
 
-# Setup to verify the Rust + SPDK sequential write implementatio
+# Setup to verify the Rust + SPDK sequential write implementation
 [sequential_write_test]
 BS="10MB"
 

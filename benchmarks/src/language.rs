@@ -1,9 +1,10 @@
-/// Benchmark:
-/// 1. Sequential write throughput for Rust + SPDK vs. dd on SSD
-/// 2. Random write latency for Rust + SPDK vs. dd on SSD
+//! Benchmark:
+//! 1. Sequential write throughput for Rust + SPDK vs. dd on SSD
+//! 2. Random write latency for Rust + SPDK vs. dd on SSD
 use colored::*;
 use env_logger::Builder;
 use failure::Error;
+use rand::Rng;
 use std::env;
 use std::fs;
 use std::mem;
@@ -12,6 +13,12 @@ use std::process;
 use std::time::Instant;
 use toml::Value;
 use utils_rustfs;
+
+#[derive(Clone)]
+enum BenchmarkType {
+    SeqWrite,
+    RandLatency,
+}
 
 pub fn main() {
     Builder::new()
@@ -22,10 +29,18 @@ pub fn main() {
     let is_rust = &args[2];
 
     if is_throughput == "1" {
+        // Sequential write test
         if is_rust == "1" {
-            rust_seq(run);
+            driver(run, BenchmarkType::SeqWrite);
         } else {
             dd_seq();
+        }
+    } else if is_throughput == "0" {
+        // Latency write test
+        if is_rust == "1" {
+            driver(run, BenchmarkType::RandLatency);
+        } else {
+            unimplemented!();
         }
     }
 }
@@ -99,15 +114,23 @@ fn dd_seq() {
 }
 
 #[allow(unused_variables)]
-async fn run(poller: spdk_rs::io_channel::PollerHandle) {
-    match await!(run_inner()) {
-        Ok(_) => println!("Successful"),
-        Err(err) => println!("Failure: {:?}", err),
+async fn run(poller: spdk_rs::io_channel::PollerHandle, benchmark_type: BenchmarkType) {
+    match benchmark_type {
+        BenchmarkType::SeqWrite => match await!(sequential_write()) {
+            Ok(_) => {}
+            Err(err) => println!("Failure: {:?}", err),
+        },
+        BenchmarkType::RandLatency => match await!(latency()) {
+            Ok(_) => {}
+            Err(err) => println!("Failure: {:?}", err),
+        },
     }
     spdk_rs::event::app_stop(true);
 }
 
-async fn run_inner() -> Result<(), Error> {
+/// Use the SPDK framework to perform sequential write
+/// and calculate the throughput
+async fn sequential_write() -> Result<(), Error> {
     let dict = parse_config().unwrap();
 
     let bs = utils_rustfs::strip(dict["sequential_write"]["BS"].to_string());
@@ -138,7 +161,11 @@ async fn run_inner() -> Result<(), Error> {
     match env::var("MALLOC0") {
         Ok(val) => {
             debug!("{}: {:?}", "MALLOC0", val);
-            ret = spdk_rs::bdev::get_by_name("Malloc0");
+            if val == "1" {
+                ret = spdk_rs::bdev::get_by_name("Malloc0");
+            } else {
+                ret = spdk_rs::bdev::get_by_name("Nvme0n1");
+            }
         }
         Err(e) => {
             debug!("couldn't interpret MALLOC0: {}", e);
@@ -162,10 +189,10 @@ async fn run_inner() -> Result<(), Error> {
     let io_channel = spdk_rs::bdev::get_io_channel(desc.clone())?;
 
     let blk_size = spdk_rs::bdev::get_block_size(bdev.clone());
-    println!("blk_size: {}", blk_size);
+    dbg!(blk_size);
 
     let buf_align = spdk_rs::bdev::get_buf_align(bdev.clone());
-    println!("buf_align: {}", buf_align);
+    dbg!(buf_align);
 
     // We need to round `bs` to be the multiple of `blk_size`
     let bs_numeric: f64 = bs.parse::<f64>().unwrap();
@@ -186,8 +213,8 @@ async fn run_inner() -> Result<(), Error> {
         buffer_vec.push(write_buf);
     }
 
-    debug!("write_size_numeric: {}", write_size_numeric);
-    debug!("num_chunks: {}", num_chunks);
+    dbg!(write_size_numeric);
+    dbg!(num_chunks);
     // let's time the execution of the write
     let start = Instant::now();
     for i in 0..num_chunks {
@@ -223,13 +250,12 @@ async fn run_inner() -> Result<(), Error> {
     Ok(())
 }
 
-/// Use the SPDK framework to perform sequential write
-/// and calculate the throughput
-fn rust_seq<
+fn driver<
     G: std::future::Future<Output = ()> + 'static,
-    F: Fn(spdk_rs::io_channel::PollerHandle) -> G,
+    F: Fn(spdk_rs::io_channel::PollerHandle, BenchmarkType) -> G,
 >(
     async_fn: F,
+    benchmark_type: BenchmarkType,
 ) {
     let config_file = Path::new("config/bdev.conf").canonicalize().unwrap();
     let mut opts = spdk_rs::event::SpdkAppOpts::new();
@@ -242,7 +268,7 @@ fn rust_seq<
         mem::forget(executor);
 
         let poller = spdk_rs::io_channel::poller_register(spdk_rs::executor::pure_poll);
-        spdk_rs::executor::spawn(async_fn(poller));
+        spdk_rs::executor::spawn(async_fn(poller, benchmark_type.clone()));
     });
 
     println!("Successfully shutdown SPDK framework");
@@ -250,4 +276,101 @@ fn rust_seq<
 
 /// Use the SPDK framework to randomly write 4K blocks on SSD for a number of times (e.g., 10K)
 /// and measure write latency
-pub fn run2() {}
+async fn latency() -> Result<(), Error> {
+    let ret;
+    match env::var("MALLOC0") {
+        Ok(val) => {
+            debug!("{}: {:?}", "MALLOC0", val);
+            if val == "1" {
+                ret = spdk_rs::bdev::get_by_name("Malloc0");
+            } else {
+                ret = spdk_rs::bdev::get_by_name("Nvme0n1");
+            }
+        }
+        Err(e) => {
+            debug!("couldn't interpret MALLOC0: {}", e);
+            ret = spdk_rs::bdev::get_by_name("Nvme0n1");
+        }
+    }
+
+    let bdev = ret.unwrap();
+    let mut desc = spdk_rs::bdev::SpdkBdevDesc::new();
+
+    // check whether device has volatile write cache enabled
+    // if it's true, we may want to call `spdk_bdev_flush()` to flush the writes (not implemented for now)
+    let is_write_cache_enabled = spdk_rs::bdev::has_write_cache(bdev.clone());
+    dbg!(is_write_cache_enabled);
+
+    match spdk_rs::bdev::open(bdev.clone(), true, &mut desc) {
+        Ok(_) => println!("Successfully open the device {}", bdev.name()),
+        _ => {}
+    };
+
+    let io_channel = spdk_rs::bdev::get_io_channel(desc.clone())?;
+
+    // In the dev environment, the number is 512. We write 4K block so we directly multiply this number by 4.
+    let blk_size = spdk_rs::bdev::get_block_size(bdev.clone());
+    dbg!(blk_size);
+
+    let buf_align = spdk_rs::bdev::get_buf_align(bdev.clone());
+    dbg!(buf_align);
+
+    let num_blocks = spdk_rs::bdev::get_num_blocks(bdev.clone());
+    dbg!(num_blocks);
+
+    let write_buf_size: usize = blk_size as usize * 4;
+    let num_chunks: usize = 10_000; // 10K
+
+    // We want to prepare a vector of buffers with random content
+    let mut buffer_vec = Vec::new();
+    for _ in 0..num_chunks {
+        // +1 for null terminator due to `snprintf` in `fill` implementation
+        let mut write_buf = spdk_rs::env::dma_zmalloc(write_buf_size + 1, buf_align);
+        let fixed_string = utils_rustfs::generate_string_fixed(write_buf_size);
+        write_buf.fill(write_buf_size + 1, "%s", &fixed_string);
+        buffer_vec.push(write_buf);
+    }
+
+    // Let's measure the latency of the write
+    let mut latency_vec = Vec::new();
+    let mut rng = rand::thread_rng();
+    for i in 0..num_chunks {
+        let offset = rng.gen_range(0, num_blocks / 4) * (write_buf_size as u64);
+        let start = Instant::now();
+        match await!(spdk_rs::bdev::write(
+            desc.clone(),
+            &io_channel,
+            &buffer_vec[i],
+            offset,
+            write_buf_size as u64
+        )) {
+            Ok(_) => {}
+            Err(error) => panic!("{:?}", error),
+        }
+        let duration = start.elapsed();
+        latency_vec.push(utils_rustfs::convert_time(duration, "ms"));
+    }
+
+    // Let's calculate average latency and standard deviation
+    println!(
+        "{}: {} ms",
+        "Average latency".blue().bold(),
+        utils_rustfs::mean(&latency_vec[..])
+            .unwrap()
+            .to_string()
+            .green()
+    );
+    println!(
+        "{}: {} ms",
+        "latency std dev".blue().bold(),
+        utils_rustfs::std_deviation(&latency_vec[..])
+            .unwrap()
+            .to_string()
+            .green()
+    );
+
+    spdk_rs::thread::put_io_channel(io_channel);
+    spdk_rs::bdev::close(desc);
+    spdk_rs::event::app_stop(true);
+    Ok(())
+}
