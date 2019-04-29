@@ -7,16 +7,22 @@ extern crate env_logger;
 extern crate failure;
 extern crate hex_literal;
 extern crate log;
+extern crate num;
 extern crate rand;
 
 use failure::Error;
+use num::{FromPrimitive, ToPrimitive};
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
 use sha2::{Digest, Sha256};
+use std::ffi::CStr;
 use std::fs;
 use std::io;
 use std::io::prelude::*;
 use std::io::Write;
+use std::iter::Sum;
+use std::os::raw::{c_char, c_int};
+use std::str;
 use std::time::Duration;
 
 pub mod constant;
@@ -175,9 +181,77 @@ pub fn get_checksum(filename: &str, save_location: &str) -> std::io::Result<()> 
     Ok(())
 }
 
+/// Gets a detailed string description for the given error number.
+/// From: https://github.com/rust-lang/rust/blob/1.26.2/src/libstd/sys/unix/os.rs#L87-L107
+pub fn error_string(errno: i32) -> String {
+    extern "C" {
+        #[cfg_attr(
+            any(target_os = "linux", target_env = "newlib"),
+            link_name = "__xpg_strerror_r"
+        )]
+        fn strerror_r(errnum: c_int, buf: *mut c_char, buflen: libc::size_t) -> c_int;
+    }
+
+    const TMPBUF_SZ: usize = 128;
+    let mut buf = [0 as c_char; TMPBUF_SZ];
+
+    let p = buf.as_mut_ptr();
+    unsafe {
+        if strerror_r(errno as c_int, p, buf.len()) < 0 {
+            panic!("strerror_r failure");
+        }
+
+        let p = p as *const _;
+        str::from_utf8(CStr::from_ptr(p).to_bytes())
+            .unwrap()
+            .to_owned()
+    }
+}
+
+/// Calculate mean of the given data
+pub fn mean<'a, T: 'a>(numbers: &'a [T]) -> Option<f64>
+where
+    T: ToPrimitive + Sum<&'a T>,
+{
+    match numbers.len() {
+        0 => None,
+        _ => {
+            let sum = numbers.iter().sum::<T>();
+            FromPrimitive::from_usize(numbers.len())
+                .and_then(|length: f64| T::to_f64(&sum).and_then(|val| Some(val / length)))
+        }
+    }
+}
+
+/// Calculate sample variance of the given data
+pub fn variance(data: &[f64]) -> Option<f64> {
+    match data.len() {
+        0 => None,
+        _ => {
+            let mean = mean(data);
+            let mut v: f64 = 0.0;
+            for s in data {
+                let x = s - mean.unwrap();
+                v = v + x * x;
+            }
+            let denom = (data.len() - 1) as f64;
+            Some(v / denom)
+        }
+    }
+}
+
+/// Calculate standard deviation of the given data
+pub fn std_deviation(data: &[f64]) -> Option<f64> {
+    match data.len() {
+        0 => None,
+        _ => Some(variance(data).unwrap().sqrt()),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::Path;
 
     #[test]
     fn test_strip() {
@@ -276,5 +350,39 @@ mod tests {
         fs::remove_file(save_location)?;
 
         Ok(())
+    }
+
+    #[test]
+    fn test_error_string() {
+        let fl = "no such file";
+        if let Err(e) = fs::metadata(fl) {
+            assert_eq!(
+                error_string(e.raw_os_error().unwrap()),
+                "No such file or directory"
+            );
+        }
+    }
+
+    #[test]
+    fn test_mean() {
+        let numbers = [10, -21, 15, 20, 18, 14, 18];
+        let err = "Slice is empty.";
+        assert_eq!(10.571428571428571, mean(&numbers).expect(err));
+        let numbers2 = [727.7, 1086.5, 1091.0, 1361.3, 1490.5, 1956.1];
+        assert_eq!(1285.5166666666667, mean(&numbers2).expect(err));
+    }
+
+    #[test]
+    fn test_variance() {
+        let numbers = [727.7, 1086.5, 1091.0, 1361.3, 1490.5, 1956.1];
+        let err = "Slice is empty.";
+        assert_eq!(177209.41766666662, variance(&numbers).expect(err));
+    }
+
+    #[test]
+    fn test_std_deviation() {
+        let numbers = [727.7, 1086.5, 1091.0, 1361.3, 1490.5, 1956.1];
+        let err = "Slice is empty.";
+        assert_eq!(420.96248961952256, std_deviation(&numbers).expect(err));
     }
 }
