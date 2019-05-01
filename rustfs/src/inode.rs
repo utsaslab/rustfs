@@ -64,41 +64,59 @@ impl ToString for Inode{
 
 impl Inode {
     pub fn new(fs: &FS, dirtype: usize, inum: usize) -> Inode {
-        // NOTE: here we show how to use spdk_rs
-        // let opts : raw::spdk_app_opts;
-//        let time_now = time::get_time();
-
-//        let sblk = &mut self.fs.alloc_block();
-//        let dblk = &mut self.fs.alloc_block();
-
         Inode {
             fs: fs,
             inum: inum,
             dirtype: dirtype,
-//            single_blknum: sblk,
-//            double_blknum: dblk,
-//            single: create_tlist(),
-//            double: create_tlist(),
             single: None,
             double: None,
             size: 0,
-
-//            mod_time: time_now,
-//            access_time: time_now,
-//            create_time: time_now
         }
-        // TODO: write this to disk?
     }
 
-    fn sync(&self){
+    fn read_inode(&self){
         let offset = &self.inode_base + &self.inum * Inode::size();
         let blk = offset / BLOCK_SIZE;
         let blk_offset = offset % BLOCK_SIZE;
         let mut read_buf = spdk_rs::env::dma_zmalloc(BLOCK_SIZE, 0);
         &self.fs.device.read(read_buf, blk, BLOCK_SIZE);
         let mut buf = read_buf.read_bytes(BLOCK_SIZE);
+        let mut content = &buf[blk_offset..blk_offset + Inode::size()];
+        unsafe{
+            &self.dirtype = mem::transmute::<[u8;8], usize>(*content[0..8]);
+            &self.size = mem::transmute::<[u8;8], usize>(*content[8..16]);
+            &self.single = Some<mem::transmute::<[u8;8], usize>(*content[16..24])>;
+            &self.double = Some<mem::transmute::<[u8;8], usize>(*content[24..32])>;
+        }
+    }
 
+    fn parse_entry(raw_read: &[u8], index: usize){
+        let start = index * Inode::size();
+        let content = &raw_read[start..start + Inode::size()];
+        unsafe{
+            let dirtype = mem::transmute::<[u8; 8], u64>(&content[0..8]);
+            let size = 
+        }
+    }
 
+    fn write_inode(&self){
+        // TODO: add unit test
+        let offset = &self.inode_base + &self.inum * Inode::size();
+        let blk = offset / BLOCK_SIZE;
+        let blk_offset = offset % BLOCK_SIZE;
+        let mut read_buf = spdk_rs::env::dma_zmalloc(BLOCK_SIZE, 0);
+        &self.fs.device.read(read_buf, blk, BLOCK_SIZE);
+        let mut buf = read_buf.read_bytes(BLOCK_SIZE);
+        let mut content = &buf[blk_offset..blk_offset + Inode::size()];
+        unsafe{
+            *content[0..8] = mem::transmute::<usize, [u8;8]>(&self.dirtype);
+            *content[8..16] = mem::transmute::<usize, [u8;8]>(&self.size);
+            *content[16..24] = mem::transmute::<usize, [u8;8]>(&self.single.unwrap());
+            *content[24..32] = mem::transmute::<usize, [u8;8]>(&self.double.unwrap());
+        }
+        let mut write_buf = mut read_buf;
+        write_buf.fill_bytes(buf);
+        &self.fs.device.write(write_buf, blk, BLOCK_SIZE);
     }
 
     pub fn size() -> usize{
@@ -112,12 +130,17 @@ impl Inode {
         };
 
         bool need_update = false;
+        &mut self.read_inode();
 
         // Getting a pointer to the page
         let page = if num == 0 {
             if &self.single.is_none() {
+//                if &self.size == 0 {
                 single = &mut self.fs.alloc_block();
                 need_update = true;
+//                }else{
+//                    &mut self.read_inode();
+//                }
             }
             single
         } else {
@@ -125,19 +148,24 @@ impl Inode {
             // entry list where necessary (*entry_list = ...)
             let index = num - 1;
             if &self.double.is_none() {
+//                if &self.size <= PAGE_SIZE {
                 double = &mut self.fs.alloc_block();
                 need_update = true;
+//                }else{
+//                }
             }
 
             // TODO: read the indirect block
             let mut read_buf = spdk_rs::env::dma_zmalloc(BLOCK_SIZE, 0);
+            let offset = &self.fs.data_base + &self.double.unwrap() * BLOCK_SIZE;
+            &mut self.fs.device.read(read_buf, offset, BLOCK_SIZE);
             let entry = Inode::parse_entry(&read_buf.read_bytes(), index);
 
             entry
         };
 
         if need_update{
-            &self.sync();
+            &self.write_inode();
         }
         page
     }
