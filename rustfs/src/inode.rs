@@ -4,11 +4,13 @@
   > Mail:            iamzeyuanhu@utexas.edu
   > Created Time:    9/21/18
   > Description:
-    
-    This file contains the implementation of the inode.
+
+  This file contains the implementation of the inode.
  ************************************************************************/
 
 extern crate spdk_rs;
+#[macro_use]
+extern crate arrayref;
 
 use self::spdk_rs::raw;
 use time;
@@ -43,23 +45,9 @@ pub struct Inode {
     inum: usize,
 
     dirtype: usize,
-//    single_blknum: usize,
-//    double_blknum: usize,
-//    single: EntryList, // Box<([Option<Page>, ..256])>
-//    double: DoubleEntryList, // Box<[Option<Box<([Option<Page>>, ..256])>, ..256]
     single: Option<usize>,
     double: Option<usize>,
     size: usize,
-
-//    mod_time: Timespec,
-//    access_time: Timespec,
-//    create_time: Timespec,
-}
-
-impl ToString for Inode{
-    fn to_string(&self) -> String{
-        
-    }
 }
 
 impl Inode {
@@ -75,7 +63,7 @@ impl Inode {
     }
 
     fn read_inode(&self){
-        let offset = &self.inode_base + &self.inum * Inode::size();
+        let offset = &self.fs.inode_base + &self.inum * Inode::size();
         let blk = offset / BLOCK_SIZE;
         let blk_offset = offset % BLOCK_SIZE;
         let mut read_buf = spdk_rs::env::dma_zmalloc(BLOCK_SIZE, 0);
@@ -83,25 +71,26 @@ impl Inode {
         let mut buf = read_buf.read_bytes(BLOCK_SIZE);
         let mut content = &buf[blk_offset..blk_offset + Inode::size()];
         unsafe{
-            &self.dirtype = mem::transmute::<[u8;8], usize>(*content[0..8]);
-            &self.size = mem::transmute::<[u8;8], usize>(*content[8..16]);
-            &self.single = Some<mem::transmute::<[u8;8], usize>(*content[16..24])>;
-            &self.double = Some<mem::transmute::<[u8;8], usize>(*content[24..32])>;
+            self.dirtype = mem::transmute::<[u8;8], usize>(*array_ref![content, 0, 8]);
+            self.size = mem::transmute::<[u8;8], usize>(*array_ref![content, 8, 8]);
+            self.single = Some(mem::transmute::<[u8;8], usize>(*array_ref![content, 16, 8]));
+            self.double = Some(mem::transmute::<[u8;8], usize>(*array_ref![content, 24, 8]));
         }
     }
 
-    fn parse_entry(raw_read: &[u8], index: usize){
-        let start = index * Inode::size();
-        let content = &raw_read[start..start + Inode::size()];
+    fn parse_entry(raw_read: &[u8], index: usize) -> usize {
+        let start = index * 8;
+        let content = &raw_read[start..start + 8];
+        let entry: usize;
         unsafe{
-            let dirtype = mem::transmute::<[u8; 8], u64>(&content[0..8]);
-            let size = 
+            entry = mem::transmute::<[u8; 8], usize>(*array_ref![content, 0, 8]); 
         }
+        entry
     }
 
     fn write_inode(&self){
         // TODO: add unit test
-        let offset = &self.inode_base + &self.inum * Inode::size();
+        let offset = &self.fs.inode_base + &self.inum * Inode::size();
         let blk = offset / BLOCK_SIZE;
         let blk_offset = offset % BLOCK_SIZE;
         let mut read_buf = spdk_rs::env::dma_zmalloc(BLOCK_SIZE, 0);
@@ -109,10 +98,14 @@ impl Inode {
         let mut buf = read_buf.read_bytes(BLOCK_SIZE);
         let mut content = &buf[blk_offset..blk_offset + Inode::size()];
         unsafe{
-            *content[0..8] = mem::transmute::<usize, [u8;8]>(&self.dirtype);
-            *content[8..16] = mem::transmute::<usize, [u8;8]>(&self.size);
-            *content[16..24] = mem::transmute::<usize, [u8;8]>(&self.single.unwrap());
-            *content[24..32] = mem::transmute::<usize, [u8;8]>(&self.double.unwrap());
+            let tmp = mem::transmute::<usize, [u8;8]>(self.dirtype);
+            content[0..8].copy_from_slice(&tmp[0..8]);
+            let tmp = mem::transmute::<usize, [u8;8]>(self.size);
+            content[8..16].copy_from_slice(&tmp[0..8]);
+            let tmp = mem::transmute::<usize, [u8;8]>(self.single.unwrap());
+            content[16..24].copy_from_slice(&tmp[0..8]);
+            let tmp = mem::transmute::<usize, [u8;8]>(self.double.unwrap());
+            content[24..32].copy_from_slice(&tmp[0..8]);
         }
         let mut write_buf = mut read_buf;
         write_buf.fill_bytes(buf);
@@ -135,12 +128,12 @@ impl Inode {
         // Getting a pointer to the page
         let page = if num == 0 {
             if &self.single.is_none() {
-//                if &self.size == 0 {
+                //                if &self.size == 0 {
                 single = &mut self.fs.alloc_block();
                 need_update = true;
-//                }else{
-//                    &mut self.read_inode();
-//                }
+                //                }else{
+                //                    &mut self.read_inode();
+                //                }
             }
             single
         } else {
@@ -148,11 +141,11 @@ impl Inode {
             // entry list where necessary (*entry_list = ...)
             let index = num - 1;
             if &self.double.is_none() {
-//                if &self.size <= PAGE_SIZE {
+                //                if &self.size <= PAGE_SIZE {
                 double = &mut self.fs.alloc_block();
                 need_update = true;
-//                }else{
-//                }
+                //                }else{
+                //                }
             }
 
             // TODO: read the indirect block
@@ -220,9 +213,9 @@ impl Inode {
         let last_byte = offset + written;
         if self.size < last_byte { self.size = last_byte; }
 
-//        let time_now = time::get_time();
-//        self.mod_time = time_now;
-//        self.access_time = time_now;
+        //        let time_now = time::get_time();
+        //        self.mod_time = time_now;
+        //        self.access_time = time_now;
 
         written
     }
@@ -247,11 +240,11 @@ impl Inode {
 
             let page = self.get_page(start + i);
             let offset = page
-            // TODO: read from this block number
-            let mut read_buf = spdk_rs::env::dma_zmalloc(blk_size as usize, buf_align);
+                // TODO: read from this block number
+                let mut read_buf = spdk_rs::env::dma_zmalloc(blk_size as usize, buf_align);
             &self.fs.device.read(&mut read_buf, offset, BLOCK_SIZE);
             let slice = read_buf.read();
-            
+
             let slice = &mut data[read..(read + num_bytes)];
             // read += slice.copy_from(page.slice(block_offset,
             // block_offset + num_bytes));
@@ -352,12 +345,12 @@ mod tests {
             println!("Reading io");
             let hello_context_ptr: *mut c_void = hello_context as *mut _ as *mut c_void;
             rc = raw::spdk_bdev_read((*hello_context).bdev_desc,
-                                     (*hello_context).bdev_io_channel,
-                                     (*hello_context).buff as *mut c_void,
-                                     0,
-                                     blk_size as u64,
-                                     Some(read_complete),
-                                     hello_context_ptr);
+            (*hello_context).bdev_io_channel,
+            (*hello_context).buff as *mut c_void,
+            0,
+            blk_size as u64,
+            Some(read_complete),
+            hello_context_ptr);
             if rc != 0 {
                 println!("{} error while reading from bdev: {}", CStr::from_ptr(raw::spdk_strerror(-rc)).to_str().unwrap(), rc);
                 raw::spdk_put_io_channel((*hello_context).bdev_io_channel);
@@ -432,7 +425,7 @@ mod tests {
             println!("Writing to the bdev");
             let hello_context_ptr: *mut c_void = hello_context as *mut _ as *mut c_void;
             rc = raw::spdk_bdev_write((*hello_context).bdev_desc, (*hello_context).bdev_io_channel,
-                                 (*hello_context).buff as *mut c_void, 0, blk_size as u64, Some(write_complete), hello_context_ptr);
+            (*hello_context).buff as *mut c_void, 0, blk_size as u64, Some(write_complete), hello_context_ptr);
             if rc != 0 {
                 println!("{0} error while writing to bdev: {1}", CStr::from_ptr(raw::spdk_strerror(-rc)).to_str().unwrap(), rc);
                 raw::spdk_bdev_close((*hello_context).bdev_desc);
