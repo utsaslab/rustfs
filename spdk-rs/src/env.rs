@@ -35,7 +35,7 @@ impl Buf {
         }
     }
 
-    /// Fill in the buffer with the given bytes vector
+    /// Fill in the buffer with the given bytes slice
     pub fn fill_bytes(&mut self, content: &[u8]) {
         let size = content.len();
         let ptr = content.as_ptr();
