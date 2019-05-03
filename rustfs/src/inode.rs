@@ -147,8 +147,6 @@ impl Inode {
                 //                }else{
                 //                }
             }
-
-            // TODO: read the indirect block
             let mut read_buf = spdk_rs::env::dma_zmalloc(BLOCK_SIZE, 0);
             let offset = &self.fs.data_base + &self.double.unwrap() * BLOCK_SIZE;
             &mut self.fs.device.read(read_buf, offset, BLOCK_SIZE);
@@ -164,16 +162,20 @@ impl Inode {
     }
 
     fn get_page<'a>(&'a self, num: usize) -> usize {
-        if num*PAGE_SIZE >= &self.size {
+        if num * PAGE_SIZE >= &self.size {
             panic!("Page does not exist.")
         };
+        &mut self.read_inode();
 
         if num == 0 {
             0
         } else {
             let index = num - 1;
-            // TODO: read the indirect block
-
+            let mut read_buf = spdk_rs::env::dma_zmalloc(BLOCK_SIZE, 0);
+            let offset = &self.fs.data_base + &self.double.unwrap() * BLOCK_SIZE;
+            &mut self.fs.device.read(read_buf, offset, BLOCK_SIZE);
+            let entry = Inode::parse_entry(&read_buf.read_bytes(), index);
+            entry
         }
     }
 
@@ -197,17 +199,26 @@ impl Inode {
             };
 
             // Finding our block, writing to it
-            let mut page = self.get_or_alloc_page(start + i);
-            let slice = &mut page[block_offset..(block_offset + num_bytes)];
+            let page = self.get_or_alloc_page(start + i);
+
+            // TODO: check this!
+            let pg_offset = self.fs.data_base + page * BLOCK_SIZE;
+            let mut read_buf = spdk_rs::env::dma_zmalloc(BLOCK_SIZE, 0);
+            &self.fs.device.read(&mut read_buf, pg_offset, BLOCK_SIZE);
+            let disk_page = read_buf.read_bytes();
+            // let slice = array_mut_ref![disk_page, block_offset, num_bytes]; 
+            let slice = &mut disk_page[block_offset..(block_offset + num_bytes)];
             // written += slice.copy_from(data.slice(written, written + num_bytes));
             unsafe {
                 // TODO: This may be extremely slow! Use copy_nonoverlapping, perhaps.
                 let src = data[written..(written + num_bytes)].as_ptr();
                 copy_nonoverlapping(src, slice.as_mut_ptr(), num_bytes);
             }
+            let mut write_buf = spdk_rs::env::dma_zmalloc(BLOCK_SIZE, 0);
+            write_buf.fill_bytes(disk_page);
+            &self.fs.device.write(&mut write_buf, offset, BLOCK_SIZE);
 
             written += num_bytes;
-            // TODO: write page back to device
         }
 
         let last_byte = offset + written;
@@ -239,18 +250,17 @@ impl Inode {
             };
 
             let page = self.get_page(start + i);
-            let offset = page
-                // TODO: read from this block number
-                let mut read_buf = spdk_rs::env::dma_zmalloc(blk_size as usize, buf_align);
-            &self.fs.device.read(&mut read_buf, offset, BLOCK_SIZE);
-            let slice = read_buf.read();
-
+            let pg_offset = self.fs.data_base + page * BLOCK_SIZE;
+            let mut read_buf = spdk_rs::env::dma_zmalloc(blk_size as usize, 0);
+            &self.fs.device.read(&mut read_buf, pg_offset, BLOCK_SIZE);
+            let disk_page = read_buf.read_bytes();
+            // TODO: check compatability here
             let slice = &mut data[read..(read + num_bytes)];
             // read += slice.copy_from(page.slice(block_offset,
             // block_offset + num_bytes));
             unsafe {
                 // copy_from is extremely slow! use copy_memory instead
-                let src = page[block_offset..(block_offset + num_bytes)].as_ptr();
+                let src = disk_page[block_offset..(block_offset + num_bytes)].as_ptr();
                 copy_nonoverlapping(src, slice.as_mut_ptr(), num_bytes);
             }
 
