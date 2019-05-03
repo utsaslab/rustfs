@@ -2,9 +2,10 @@
 name = "rustfs"
 version = "0.1.0"
 authors = ["xxks-kkk <ferrishu3886@gmail.com>"]
+edition = "2018"
 
 [dependencies]
 time = "0.1"
-rand = "0.3"
+rand = "0.6"
 spdk-rs = { path="../spdk-rs"}
 libc = "0.2"
