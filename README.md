@@ -2,6 +2,8 @@
 The goal of RustFS is to build a new user-space file system for NVMe SSDs that gets performance similar to an in-kernel file system. 
 RustFS will be written in Rust, taking advantage of the high-level features offered by Rust. 
 
+**WORK IN PROGRESS: ONLY SUPPORT SPDK 18.07 RELEASE AND RUST nightly-2019-01-11**
+
 ## Committers
 1. [Zeyuan Hu (xxks-kkk)](http://github.com/xxks-kkk)
 3. [Vijay Chidambaram (vijay03)](https://github.com/vijay03)
