@@ -66,10 +66,16 @@ impl<'r> Proc<'r> {
             Some(f) => f,
             None => {
                 if (flags & O_CREAT) != 0 {
-                    let inode = Inode::new();
+                    let inum = &self.fs.inode_bitmap.find()?;
+                    let inode = Inode::new(&self.fs, FILE_TYPE, inum);
                     let file = File::new_data_file(inode);
                     // TODO: write to disk here
                     self.cwd.insert(path, file.clone());
+                    inode.write_inode();
+                    match self.cwd{
+                        Directory(dc) => dc.inode.write_inode();
+                        _ => ;
+                    }
                     file
                 } else {
                     EmptyFile
