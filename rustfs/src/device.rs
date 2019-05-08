@@ -52,7 +52,7 @@ impl Device {
         ));
     }
 
-    fn get_blk_size(&self) -> u32 {
+    fn blk_size(&self) -> u32 {
         self.blk_size
     }
 }

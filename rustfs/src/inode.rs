@@ -6,6 +6,7 @@ use time::Timespec;
 
 const BLOCK_SIZE: usize = 512;
 const LIST_SIZE: usize = 16;
+pub const INODE_SIZE: usize = 32;
 
 type Page = Box<([u8; BLOCK_SIZE])>;
 type Entry = Page;
@@ -103,10 +104,6 @@ impl Inode {
         let mut write_buf = read_buf;
         write_buf.fill_bytes(buf);
         &self.fs.device.write(write_buf, blk, BLOCK_SIZE);
-    }
-
-    pub fn size() -> usize {
-        32
     }
 
     // read inode metadata and return block number

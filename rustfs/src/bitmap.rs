@@ -1,8 +1,12 @@
+use crate::constants;
 use crate::device;
+use crate::file;
 use crate::inode;
 
+use constants::DIR_TYPE;
 use device::Device;
 use failure::Error;
+use file::File;
 use inode::Inode;
 
 #[derive(Debug, Fail)]
@@ -70,13 +74,13 @@ pub struct FS {
 impl FS {
     pub fn new() -> FS {
         let device = Device::new();
-        let blk_size = device.get_blk_size();
+        let blk_size = device.blk_size();
         FS {
             device: device,
             inode_base: 3 * blk_size,
-            data_base: 3 * blk_size + inode::size() * device.blk_size * 8,
-            inode_bitmap: Bitmap::new(device.blk_size, device.blk_size),
-            data_bitmap: Bitmap::new(2 * device.blk_size, device.blk_size),
+            data_base: 3 * blk_size + inode::INODE_SIZE * blk_size * 8,
+            inode_bitmap: Bitmap::new(blk_size, blk_size),
+            data_bitmap: Bitmap::new(2 * blk_size, blk_size),
             root: None,
         }
     }
@@ -97,20 +101,20 @@ impl FS {
             spdk_rs::env::dma_zmalloc(&self.device.blk_size as usize, &self.device.buf_align);
         let &mut write_buf =
             spdk_rs::env::dma_zmalloc(&self.device.blk_size as usize, &self.device.buf_align);
-        write_buf.fill(blk_size as usize, "%s", "RustFS--");
+        write_buf.fill(&self.device.blk_size as usize, "%s", "RustFS--");
         &mut self.device.write(&write_buf, 0, &self.device.blk_size);
 
         // Define - root lives in first inode
         let byte: u8 = 1;
-        write_buf.fill(blk_size as usize, "%s", byte.to_string());
+        write_buf.fill(&self.device.blk_size as usize, "%s", byte.to_string());
         &mut self
             .device
             .write(&write_buf, &self.device.blk_size, &self.device.blk_size);
         &mut self
             .device
             .write(&zero_buf, 2 * &self.device.blk_size, &self.device.blk_size);
-        root = Inode(&mut self, DIR_TYPE, 0);
-        write_buf.fill(blk_size as usize, "%s\n", root.to_string());
+        let root = inode::Inode::new(&mut self, DIR_TYPE, 0);
+        write_buf.fill(&self.device.blk_size as usize, "%s\n", root.to_string());
         &mut self
             .device
             .write(&write_buf, 3 * &self.device.blk_size, &self.device.blk_size);
@@ -122,21 +126,21 @@ impl FS {
         &mut self
             .device
             .read(&read_buf, &self.device.blk_size, &self.device.blk_size);
-        inode_bitmap.bitmap = read_buf.read();
+        self.inode_bitmap.bitmap = read_buf.read();
         &mut self
             .device
             .read(&read_buf, 2 * &self.device.blk_size, &self.device.blk_size);
-        data_bitmap.bitmap = read_buf.read();
+        self.data_bitmap.bitmap = read_buf.read();
         &mut self
             .device
             .read(&read_buf, 3 * &self.device.blk_size, &self.device.blk_size);
         let inode = read_buf.read().to_string().parse::<Inode>().unwrap;
-        root = inode;
+        self.root = inode;
     }
 
-    pub fn root(&self) -> File {
-        Datafile(&self.root.unwrap())
-    }
+    // pub fn root(&self) -> File::DataFile {
+    //     File::Datafile(&self.root.unwrap())
+    // }
     /*
     pub fn find(String path){
 
