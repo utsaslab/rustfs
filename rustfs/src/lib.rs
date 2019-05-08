@@ -1,16 +1,23 @@
+#![feature(uniform_paths)]
+#![feature(async_await, await_macro, futures_api)]
+
 #[macro_use]
 extern crate arrayref;
 extern crate spdk_rs;
 extern crate time;
+#[macro_use]
+extern crate failure;
 
+mod bitmap;
+mod device;
 mod directory;
 mod file;
 mod inode;
 
+use bitmap::FS;
 use directory::DirectoryHandle;
 use file::File::{DataFile, Directory, EmptyFile};
 use file::{File, FileHandle};
-use fs::FS;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;

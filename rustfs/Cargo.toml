@@ -10,3 +10,4 @@ rand = "0.6"
 spdk-rs = { path="../spdk-rs"}
 libc = "0.2"
 arrayref = "0.3.5"
+failure = "0.1.3"
