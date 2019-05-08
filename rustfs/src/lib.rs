@@ -59,9 +59,9 @@ impl<'r> Proc<'r> {
             Some(f) => f,
             None => {
                 if (flags & O_CREAT) != 0 {
-                    // FIXME: Fetch from allocator
-                    let rcinode = Rc::new(RefCell::new(Box::new(Inode::new())));
-                    let file = File::new_data_file(rcinode);
+                    let inode = Inode::new();
+                    let file = File::new_data_file(inode);
+                    // TODO: write to disk here
                     self.cwd.insert(path, file.clone());
                     file
                 } else {
