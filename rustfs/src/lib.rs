@@ -36,7 +36,7 @@ pub const O_APPEND: u32 =   (1 << 4);
 pub const O_CREAT: u32 =    (1 << 5);
 
 pub struct Proc<'r> {
-    fs: &mut FS,
+    fs: FS,
     cwd: File<'r>,
     fd_table: HashMap<FileDescriptor, FileHandle<'r>>,
     fds: Vec<FileDescriptor>

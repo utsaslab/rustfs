@@ -12,17 +12,16 @@ extern crate spdk_rs;
 #[macro_use]
 extern crate arrayref;
 
-use self::spdk_rs::raw;
 use time;
 use time::Timespec;
 use std::mem;
 use std::ptr;
 use std::ptr::copy_nonoverlapping;
 
-const PAGE_SIZE: usize = 512;
+const BLOCK_SIZE: usize = 512;
 const LIST_SIZE: usize = 16;
 
-type Page = Box<([u8; PAGE_SIZE])>;
+type Page = Box<([u8; BLOCK_SIZE])>;
 type Entry = Page;
 type EntryList = TList<Entry>; // TODO: Option<TList> for lazy loading
 type DoubleEntryList = TList<EntryList>;
@@ -107,7 +106,7 @@ impl Inode {
             let tmp = mem::transmute::<usize, [u8;8]>(self.double.unwrap());
             content[24..32].copy_from_slice(&tmp[0..8]);
         }
-        let mut write_buf = mut read_buf;
+        let mut write_buf = read_buf;
         write_buf.fill_bytes(buf);
         &self.fs.device.write(write_buf, blk, BLOCK_SIZE);
     }
@@ -122,7 +121,7 @@ impl Inode {
             panic!("Maximum file size exceeded!")
         };
 
-        bool need_update = false;
+        let need_update = false;
         &mut self.read_inode();
 
         // Getting a pointer to the page
@@ -141,7 +140,7 @@ impl Inode {
             // entry list where necessary (*entry_list = ...)
             let index = num - 1;
             if &self.double.is_none() {
-                //                if &self.size <= PAGE_SIZE {
+                //                if &self.size <= BLOCK_SIZE {
                 double = &mut self.fs.alloc_block();
                 need_update = true;
                 //                }else{
@@ -162,7 +161,7 @@ impl Inode {
     }
 
     fn get_page<'a>(&'a self, num: usize) -> usize {
-        if num * PAGE_SIZE >= &self.size {
+        if num * BLOCK_SIZE >= &self.size {
             panic!("Page does not exist.")
         };
         &mut self.read_inode();
@@ -181,10 +180,10 @@ impl Inode {
 
     pub fn write(&mut self, offset: usize, data: &[u8]) -> usize {
         let mut written = 0;
-        let mut block_offset = offset % PAGE_SIZE; // offset from first block
+        let mut block_offset = offset % BLOCK_SIZE; // offset from first block
 
-        let start = offset / PAGE_SIZE; // first block to act on
-        let blocks_to_act_on = ceil_div(block_offset + data.len(), PAGE_SIZE);
+        let start = offset / BLOCK_SIZE; // first block to act on
+        let blocks_to_act_on = ceil_div(block_offset + data.len(), BLOCK_SIZE);
 
         for i in 0..blocks_to_act_on {
             // Resetting the block offset after first pass since we want to read from
@@ -195,7 +194,7 @@ impl Inode {
             let num_bytes = if i == blocks_to_act_on - 1 {
                 data.len() - written
             } else {
-                PAGE_SIZE - block_offset
+                BLOCK_SIZE - block_offset
             };
 
             // Finding our block, writing to it
@@ -233,9 +232,9 @@ impl Inode {
 
     pub fn read(&self, offset: usize, data: &mut [u8]) -> usize {
         let mut read = 0;
-        let mut block_offset = offset % PAGE_SIZE; // offset from first block
-        let start = offset / PAGE_SIZE; // first block to act on
-        let blocks_to_act_on = ceil_div(block_offset + data.len(), PAGE_SIZE);
+        let mut block_offset = offset % BLOCK_SIZE; // offset from first block
+        let start = offset / BLOCK_SIZE; // first block to act on
+        let blocks_to_act_on = ceil_div(block_offset + data.len(), BLOCK_SIZE);
 
         for i in 0..blocks_to_act_on {
             // Resetting the block offset after first pass since we want to read from
@@ -246,7 +245,7 @@ impl Inode {
             let num_bytes = if i == blocks_to_act_on - 1 {
                 data.len() - read
             } else {
-                PAGE_SIZE - block_offset
+                BLOCK_SIZE - block_offset
             };
 
             let page = self.get_page(start + i);

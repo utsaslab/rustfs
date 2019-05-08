@@ -51,8 +51,8 @@ pub enum Whence {
 impl<'r> File<'r> {
     pub fn new_dir(_parent: Option<File<'r>>) -> File<'r> {
         let content = DirectoryContent { 
-                entries: HashMap::new() 
-                inode: new Inode(fs, DIR_TYPE, inum)
+                entries: HashMap::new(),
+                inode: Inode::new(fs, DIR_TYPE, inum)
         };
 //        let rc = Rc::new(RefCell::new(content));
         let dir = Directory(content);
