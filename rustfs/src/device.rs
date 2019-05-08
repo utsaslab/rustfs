@@ -3,6 +3,7 @@ extern crate spdk_rs;
 
 use spdk_rs::bdev;
 use spdk_rs::bdev::SpdkBdevDesc;
+use spdk_rs::env;
 use spdk_rs::thread::SpdkIoChannel;
 
 pub struct Device {
@@ -49,6 +50,10 @@ impl Device {
             offset,
             nbytes
         ));
+    }
+
+    fn get_blk_size(&self) -> u32 {
+        self.blk_size
     }
 }
 

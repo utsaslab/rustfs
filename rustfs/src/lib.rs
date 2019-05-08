@@ -43,9 +43,9 @@ pub struct Proc<'r> {
 }
 
 impl<'r> Proc<'r> {
-    pub fn new(fs: &mut FS) -> Proc<'r> {
+    pub fn new(file_system: &mut FS) -> Proc<'r> {
         Proc {
-            fs: FS,
+            file_system,
             cwd: FS::root(),
             fd_table: HashMap::new(),
             fds: (0..(256 - 2)).map(|i| 256 - i).collect(),

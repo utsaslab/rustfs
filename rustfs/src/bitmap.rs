@@ -1,17 +1,9 @@
-/*************************************************************************
-  > File Name:       bitmap.rs
-  > Author:          Yuhao Zheng
-  > Mail:            yuhao@utexas.edu
-  > Created Time:    4/20/19
-  > Description:
-
-    This file contains the implementation of bitmap.
-************************************************************************/
-
 use crate::device;
+use crate::inode;
 
 use device::Device;
 use failure::Error;
+use inode::Inode;
 
 #[derive(Debug, Fail)]
 pub enum BitmapErr {
@@ -72,20 +64,19 @@ pub struct FS {
     data_base: usize,
     inode_bitmap: Bitmap,
     data_bitmap: Bitmap,
-    root: Option<Inode>,
+    root: Inode,
 }
 
 impl FS {
     pub fn new() -> FS {
-        device = Device::new();
-        inode_bmp = Bitmap::new(device.blk_size, device.blk_size);
-        data_bmp = Bitmap::new(2 * device.blk_size, device.blk_size);
+        let device = Device::new();
+        let blk_size = device.get_blk_size();
         FS {
             device: device,
-            inode_base: 3 * device.blk_size,
-            data_base: 3 * device.blk_size + inode::size() * device.blk_size * 8,
-            inode_bitmap: inode_bmp,
-            data_bitmap: data_bmp,
+            inode_base: 3 * blk_size,
+            data_base: 3 * blk_size + inode::size() * device.blk_size * 8,
+            inode_bitmap: Bitmap::new(device.blk_size, device.blk_size),
+            data_bitmap: Bitmap::new(2 * device.blk_size, device.blk_size),
             root: None,
         }
     }
