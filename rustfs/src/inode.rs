@@ -1,4 +1,3 @@
-use self::spdk_rs::raw;
 use std::mem;
 use std::ptr;
 use std::ptr::copy_nonoverlapping;

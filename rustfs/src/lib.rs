@@ -1,16 +1,23 @@
+#![feature(uniform_paths)]
+#![feature(async_await, await_macro, futures_api)]
+
 #[macro_use]
 extern crate arrayref;
 extern crate spdk_rs;
 extern crate time;
+#[macro_use]
+extern crate failure;
 
+mod bitmap;
+mod device;
 mod directory;
 mod file;
 mod inode;
 
+use bitmap::FS;
 use directory::DirectoryHandle;
 use file::File::{DataFile, Directory, EmptyFile};
 use file::{File, FileHandle};
-use fs::FS;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -36,9 +43,9 @@ pub struct Proc<'r> {
 }
 
 impl<'r> Proc<'r> {
-    pub fn new(fs: &mut FS) -> Proc<'r> {
+    pub fn new(file_system: &mut FS) -> Proc<'r> {
         Proc {
-            fs: FS,
+            file_system,
             cwd: FS::root(),
             fd_table: HashMap::new(),
             fds: (0..(256 - 2)).map(|i| 256 - i).collect(),

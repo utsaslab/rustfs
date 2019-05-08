@@ -1,4 +1,7 @@
 use self::File::{DataFile, Directory};
+
+use crate::inode;
+
 use inode::Inode;
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
