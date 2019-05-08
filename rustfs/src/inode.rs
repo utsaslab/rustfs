@@ -1,7 +1,3 @@
-extern crate spdk_rs;
-#[macro_use]
-extern crate arrayref;
-
 use self::spdk_rs::raw;
 use std::mem;
 use std::ptr;
@@ -120,11 +116,7 @@ impl Inode {
             panic!("Maximum file size exceeded!")
         };
 
-<<<<<<< HEAD
-        let need_update = false;
-=======
         let need_update: bool = false;
->>>>>>> 182e1a6124360f950f16e952b7f2729ed458bd3b
         &mut self.read_inode();
 
         // Getting a pointer to the page
@@ -164,11 +156,7 @@ impl Inode {
     }
 
     fn get_page<'a>(&'a self, num: usize) -> usize {
-<<<<<<< HEAD
         if num * BLOCK_SIZE >= &self.size {
-=======
-        if num * PAGE_SIZE >= &self.size {
->>>>>>> 182e1a6124360f950f16e952b7f2729ed458bd3b
             panic!("Page does not exist.")
         };
         &mut self.read_inode();
@@ -177,15 +165,14 @@ impl Inode {
             0
         } else {
             let index = num - 1;
-<<<<<<< HEAD
+
             let mut read_buf = spdk_rs::env::dma_zmalloc(BLOCK_SIZE, 0);
             let offset = &self.fs.data_base + &self.double.unwrap() * BLOCK_SIZE;
             &mut self.fs.device.read(read_buf, offset, BLOCK_SIZE);
             let entry = Inode::parse_entry(&read_buf.read_bytes(), index);
             entry
-=======
+
             // TODO: read the indirect block
->>>>>>> 182e1a6124360f950f16e952b7f2729ed458bd3b
         }
     }
 
@@ -218,7 +205,7 @@ impl Inode {
             let mut read_buf = spdk_rs::env::dma_zmalloc(BLOCK_SIZE, 0);
             &self.fs.device.read(&mut read_buf, pg_offset, BLOCK_SIZE);
             let disk_page = read_buf.read_bytes();
-            // let slice = array_mut_ref![disk_page, block_offset, num_bytes]; 
+            // let slice = array_mut_ref![disk_page, block_offset, num_bytes];
             let slice = &mut disk_page[block_offset..(block_offset + num_bytes)];
             // written += slice.copy_from(data.slice(written, written + num_bytes));
             unsafe {
@@ -266,20 +253,12 @@ impl Inode {
             };
 
             let page = self.get_page(start + i);
-<<<<<<< HEAD
             let pg_offset = self.fs.data_base + page * BLOCK_SIZE;
             let mut read_buf = spdk_rs::env::dma_zmalloc(blk_size as usize, 0);
             &self.fs.device.read(&mut read_buf, pg_offset, BLOCK_SIZE);
             let disk_page = read_buf.read_bytes();
             // TODO: check compatability here
-=======
-            let offset = page;
-            // TODO: read from this block number
-            let mut read_buf = spdk_rs::env::dma_zmalloc(blk_size as usize, buf_align);
-            &self.fs.device.read(&mut read_buf, offset, BLOCK_SIZE);
-            let slice = read_buf.read();
 
->>>>>>> 182e1a6124360f950f16e952b7f2729ed458bd3b
             let slice = &mut data[read..(read + num_bytes)];
             // read += slice.copy_from(page.slice(block_offset,
             // block_offset + num_bytes));

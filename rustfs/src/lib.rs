@@ -1,26 +1,19 @@
-/*************************************************************************
-  > File Name:       lib.rs
-  > Author:          Zeyuan Hu
-  > Mail:            iamzeyuanhu@utexas.edu
-  > Created Time:    9/21/18
-  > Description:
-    
-    Fill in the purpose of this source file here.
- ************************************************************************/
-
+#[macro_use]
+extern crate arrayref;
+extern crate spdk_rs;
 extern crate time;
 
 mod directory;
 mod file;
 mod inode;
 
-use file::{File, FileHandle};
-use file::File::{EmptyFile, DataFile, Directory};
-use std::rc::Rc;
-use std::cell::{RefCell};
-use std::collections::HashMap;
 use directory::DirectoryHandle;
+use file::File::{DataFile, Directory, EmptyFile};
+use file::{File, FileHandle};
 use fs::FS;
+use std::cell::RefCell;
+use std::collections::HashMap;
+use std::rc::Rc;
 
 pub use file::Whence;
 pub use inode::Inode;
@@ -28,22 +21,22 @@ pub use inode::Inode;
 pub type FileDescriptor = isize;
 pub static mut fs: FS = FS::new();
 
-pub const O_RDONLY: u32 =   (1 << 0);
-pub const O_WRONLY: u32 =   (1 << 1);
-pub const O_RDWR: u32 =     (1 << 2);
+pub const O_RDONLY: u32 = (1 << 0);
+pub const O_WRONLY: u32 = (1 << 1);
+pub const O_RDWR: u32 = (1 << 2);
 pub const O_NONBLOCK: u32 = (1 << 3);
-pub const O_APPEND: u32 =   (1 << 4);
-pub const O_CREAT: u32 =    (1 << 5);
+pub const O_APPEND: u32 = (1 << 4);
+pub const O_CREAT: u32 = (1 << 5);
 
 pub struct Proc<'r> {
     fs: FS,
     cwd: File<'r>,
     fd_table: HashMap<FileDescriptor, FileHandle<'r>>,
-    fds: Vec<FileDescriptor>
+    fds: Vec<FileDescriptor>,
 }
 
 impl<'r> Proc<'r> {
-    pub fn new(fs:&mut FS) -> Proc<'r> {
+    pub fn new(fs: &mut FS) -> Proc<'r> {
         Proc {
             fs: FS,
             cwd: FS::root(),
@@ -56,7 +49,7 @@ impl<'r> Proc<'r> {
     fn extract_fd(fd_opt: &Option<FileDescriptor>) -> FileDescriptor {
         match fd_opt {
             &Some(fd) => fd,
-            &None => panic!("Error in FD allocation.")
+            &None => panic!("Error in FD allocation."),
         }
     }
 
@@ -119,10 +112,10 @@ mod proc_tests {
     // extern crate test;
     extern crate rand;
 
-    use super::{Proc, O_RDWR, O_CREAT};
+    use self::rand::random;
+    use super::{Proc, O_CREAT, O_RDWR};
     use file::Whence::SeekSet;
     use inode::Inode;
-    use self::rand::random;
 
     static mut test_inode_drop: bool = false;
 
@@ -193,7 +186,9 @@ mod proc_tests {
     fn test_proc_drop_inode_dealloc() {
         // Variable is used to make sure that the Drop implemented is only valid for
         // tests that set that test_inode_drop global variable to true.
-        unsafe { test_inode_drop = true; }
+        unsafe {
+            test_inode_drop = true;
+        }
 
         const SIZE: usize = 4096 * 3 + 3498;
         let mut p = Proc::new();
@@ -217,7 +212,9 @@ mod proc_tests {
     #[should_panic]
     fn test_inode_dealloc() {
         // Make sure flag is set to detect drop.
-        unsafe { test_inode_drop = true; }
+        unsafe {
+            test_inode_drop = true;
+        }
 
         const SIZE: usize = 4096 * 3 + 3498;
         let mut p = Proc::new();

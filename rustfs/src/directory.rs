@@ -1,13 +1,3 @@
-/*************************************************************************
-  > File Name:       directory.rs
-  > Author:          Zeyuan Hu
-  > Mail:            iamzeyuanhu@utexas.edu
-  > Created Time:    9/21/18
-  > Description:
-    
-    Fill in the purpose of this source file here.
- ************************************************************************/
-
 use file::File;
 use file::File::Directory;
 
@@ -22,7 +12,7 @@ impl<'r> DirectoryHandle<'r> for File<'r> {
     fn is_dir(&self) -> bool {
         match self {
             &Directory(_) => true,
-            _ => false
+            _ => false,
         }
     }
 
@@ -43,7 +33,7 @@ impl<'r> DirectoryHandle<'r> for File<'r> {
         let content = rc.borrow();
         match content.entries.get(&name) {
             None => None,
-            Some(ref file) => Some((*file).clone()) // It's RC
+            Some(ref file) => Some((*file).clone()), // It's RC
         }
     }
 }

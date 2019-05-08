@@ -1,5 +1,3 @@
-extern crate time;
-
 use self::File::{DataFile, Directory};
 use inode::Inode;
 use std::cell::{Cell, RefCell};
