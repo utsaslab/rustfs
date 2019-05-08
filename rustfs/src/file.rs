@@ -1,20 +1,10 @@
-/*************************************************************************
-  > File Name:       file.rs
-  > Author:          Zeyuan Hu
-  > Mail:            iamzeyuanhu@utexas.edu
-  > Created Time:    9/21/18
-  > Description:
-    
-    Fill in the purpose of this source file here.
- ************************************************************************/
-
 extern crate time;
 
+use self::File::{DataFile, Directory};
+use inode::Inode;
+use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::rc::Rc;
-use std::cell::{Cell, RefCell};
-use inode::{Inode};
-use self::File::{DataFile, Directory};
 
 //pub type RcDirContent<'r> = Rc<RefCell<Box<DirectoryContent<'r>>>>;
 //pub type RcInode = Rc<RefCell<Box<Inode>>>;
@@ -26,35 +16,35 @@ use self::File::{DataFile, Directory};
 pub enum File<'r> {
     DataFile(Inode),
     Directory(DirectoryContent<'r>),
-    EmptyFile
+    EmptyFile,
 }
 
 #[derive(Clone)]
 pub struct FileHandle<'r> {
     file: File<'r>,
-    seek: Cell<usize>
+    seek: Cell<usize>,
 }
 
 // Preserve this and write to disk?
 #[derive(Clone)]
 pub struct DirectoryContent<'r> {
     pub entries: HashMap<&'r str, File<'r>>,
-    pub inode: Inode
+    pub inode: Inode,
 }
 
 pub enum Whence {
     SeekSet,
     SeekCur,
-    SeekEnd
+    SeekEnd,
 }
 
 impl<'r> File<'r> {
     pub fn new_dir(_parent: Option<File<'r>>) -> File<'r> {
-        let content = DirectoryContent { 
-                entries: HashMap::new() 
-                inode: new Inode(fs, DIR_TYPE, inum)
+        let content = DirectoryContent {
+            entries: HashMap::new(),
+            inode: Inode(fs, DIR_TYPE, inum),
         };
-//        let rc = Rc::new(RefCell::new(content));
+        //        let rc = Rc::new(RefCell::new(content));
         let dir = Directory(content);
         // TODO: write to disk here
 
@@ -77,7 +67,7 @@ impl<'r> File<'r> {
         // TODO: write to disk
         DataFile(inode)
     }
-/*
+    /*
     pub fn get_dir_rc<'a>(&'a self) -> &'a RcDirContent<'r> {
         match self {
             &Directory(ref rc) => rc,
@@ -91,8 +81,6 @@ impl<'r> File<'r> {
             _ => panic!("not a directory")
         }
     }*/
-    
-
 }
 
 impl<'r> FileHandle<'r> {
@@ -100,15 +88,15 @@ impl<'r> FileHandle<'r> {
     pub fn new(file: File<'r>) -> FileHandle<'r> {
         FileHandle {
             file: file,
-            seek: Cell::new(0)
+            seek: Cell::new(0),
         }
     }
 
     pub fn read(&self, dst: &mut [u8]) -> usize {
         let offset = self.seek.get();
         // TODO: read from inode
-//        let inode_rc = self.file.get_inode_rc();
-//        let changed = inode_rc.borrow().read(offset, dst);
+        //        let inode_rc = self.file.get_inode_rc();
+        //        let changed = inode_rc.borrow().read(offset, dst);
         self.seek.set(offset + changed);
         changed
     }
@@ -116,20 +104,20 @@ impl<'r> FileHandle<'r> {
     pub fn write(&mut self, src: &[u8]) -> usize {
         let offset = self.seek.get();
         // TODO: write to inode
-//        let inode_rc = self.file.get_inode_rc();
-//        let changed = inode_rc.borrow_mut().write(offset, src);
+        //        let inode_rc = self.file.get_inode_rc();
+        //        let changed = inode_rc.borrow_mut().write(offset, src);
         self.seek.set(offset + changed);
         changed
     }
 
     pub fn seek(&mut self, offset: isize, whence: Whence) -> usize {
-//        let inode_rc = self.file.get_inode_rc();
+        //        let inode_rc = self.file.get_inode_rc();
 
         let seek = self.seek.get();
         let new_seek = match whence {
             Whence::SeekSet => offset as usize,
             Whence::SeekCur => (seek as isize + offset) as usize,
-            Whence::SeekEnd => (inode_rc.borrow().size() as isize + offset) as usize
+            Whence::SeekEnd => (inode_rc.borrow().size() as isize + offset) as usize,
         };
 
         self.seek.set(new_seek);
