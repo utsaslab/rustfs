@@ -47,7 +47,7 @@ impl<'r> File<'r> {
         };
         //        let rc = Rc::new(RefCell::new(content));
         let dir = Directory(content);
-        // TODO: write to disk here
+        // TODO: write to disk here ?? 
 
         // Note that dir is RCd, so this is cheap
         // Used to borrow dir and mut_dir at "same time"
@@ -65,23 +65,23 @@ impl<'r> File<'r> {
     }
 
     pub fn new_data_file(inode: Inode) -> File<'r> {
-        // TODO: write to disk
+        // TODO: write to disk ??
         DataFile(inode)
     }
-    /*
-    pub fn get_dir_rc<'a>(&'a self) -> &'a RcDirContent<'r> {
+    
+    pub fn get_dir(&self) -> Inode {
         match self {
-            &Directory(ref rc) => rc,
+            &Directory(dir_content) => dir_content.inode,
             _ => panic!("not a directory")
         }
     }
 
-    pub fn get_inode_rc<'a>(&'a self) -> &'a RcInode {
+    pub fn get_inode(&self) -> Inode {
         match self {
-            &DataFile(ref rc) => rc,
+            &DataFile(inode) => inode,
             _ => panic!("not a directory")
         }
-    }*/
+    }
 }
 
 impl<'r> FileHandle<'r> {
@@ -96,8 +96,8 @@ impl<'r> FileHandle<'r> {
     pub fn read(&self, dst: &mut [u8]) -> usize {
         let offset = self.seek.get();
         // TODO: read from inode
-        //        let inode_rc = self.file.get_inode_rc();
-        //        let changed = inode_rc.borrow().read(offset, dst);
+        let inode = self.file.get_inode();
+        let changed = inode.read(offset, dst);
         self.seek.set(offset + changed);
         changed
     }
@@ -105,15 +105,13 @@ impl<'r> FileHandle<'r> {
     pub fn write(&mut self, src: &[u8]) -> usize {
         let offset = self.seek.get();
         // TODO: write to inode
-        //        let inode_rc = self.file.get_inode_rc();
-        //        let changed = inode_rc.borrow_mut().write(offset, src);
+        let inode = self.file.get_inode();
+        let changed = inode.write(offset, src);
         self.seek.set(offset + changed);
         changed
     }
 
     pub fn seek(&mut self, offset: isize, whence: Whence) -> usize {
-        //        let inode_rc = self.file.get_inode_rc();
-
         let seek = self.seek.get();
         let new_seek = match whence {
             Whence::SeekSet => offset as usize,
