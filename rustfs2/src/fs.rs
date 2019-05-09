@@ -6,35 +6,51 @@ use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::Path;
 use std::process;
 use std::thread;
-
+use num_derive::FromPrimitive;    
+use num_traits::FromPrimitive;
 use nix::sys::signal::*;
 use nix::unistd::*;
+use std::io::prelude::*;
+
 
 use crate::constants::{DEFAULT_SERVER1_SOCKET_PATH, DEFAULT_SERVER2_SOCKET_PATH};
 
-#[derive(PartialEq, Debug, Clone, Copy)]
-enum SPDK_OPS {
-    NO_OP,
-    SHUTDOWN
+#[derive(PartialEq, Debug, Clone, Copy, FromPrimitive)]
+enum FS_OPS {
+    NO_OP = 0,
+    SHUTDOWN = 1,
+    OPEN = 2,
+    UNSUPPORTED = 3
 }
 
 /// Handle the request from application
-fn handle_client(stream: UnixStream) {
+fn handle_client(stream: UnixStream) -> FS_OPS{
     let stream = BufReader::new(stream);
     for line in stream.lines() {
-        println!("{}", line.unwrap());
+        match FromPrimitive::from_i32(line.unwrap().parse::<i32>().unwrap()) {
+            Some(FS_OPS::SHUTDOWN) => return FS_OPS::SHUTDOWN,
+            None => return FS_OPS::UNSUPPORTED,
+            Some(FS_OPS::OPEN) => unimplemented!(),
+            Some(FS_OPS::NO_OP) => {},
+            Some(FS_OPS::UNSUPPORTED) => return FS_OPS::UNSUPPORTED
+        }
     }
+    FS_OPS::NO_OP
 }
 
 /// Handle the request from server1
-fn handle_server1(stream: UnixStream) -> SPDK_OPS {
+fn handle_server1(stream: UnixStream) -> FS_OPS {
     let stream = BufReader::new(stream);
     for line in stream.lines() {
-        if line.unwrap() == "stop" {
-            return SPDK_OPS::SHUTDOWN;
-        }
+        match FromPrimitive::from_i32(line.unwrap().parse::<i32>().unwrap()) {
+            Some(FS_OPS::SHUTDOWN) => return FS_OPS::SHUTDOWN,
+            None => return FS_OPS::UNSUPPORTED,
+            Some(FS_OPS::OPEN) => unimplemented!(),
+            Some(FS_OPS::NO_OP) => {},
+            Some(FS_OPS::UNSUPPORTED) => return FS_OPS::UNSUPPORTED            
+        }        
     }
-    SPDK_OPS::NO_OP
+    FS_OPS::NO_OP
 }
 
 #[allow(unused_variables)]
@@ -52,7 +68,7 @@ async fn start_server2(poller: spdk_rs::io_channel::PollerHandle) {
                 let handle = thread::spawn(|| handle_server1(stream));
                 let res = handle.join().unwrap();
                 dbg!(res);
-                if res == SPDK_OPS::SHUTDOWN {
+                if res == FS_OPS::SHUTDOWN {
                     break;
                 }
             }
@@ -113,7 +129,12 @@ impl FS {
                 for stream in listener.incoming() {
                     match stream {
                         Ok(stream) => {
-                            thread::spawn(|| handle_client(stream));
+                            let handle = thread::spawn(|| handle_client(stream));
+                            let res = handle.join().unwrap();
+                            dbg!(res);
+                            if res == FS_OPS::SHUTDOWN {
+                                break;
+                            }                            
                         }
                         Err(err) => {
                             println!("Error: {}", err);
@@ -125,10 +146,26 @@ impl FS {
             }
             ForkResult::Child => {
                 // We're in the child process; we start server2
-                //process::exit(0);
                 start_spdk(start_server2);
                 Ok(())
             }
         }
+    }
+
+    /// Open()
+    pub fn open() -> usize {
+        let mut stream = UnixStream::connect(DEFAULT_SERVER1_SOCKET_PATH).unwrap();
+        stream.write_all(b"hello world").unwrap();
+        0
+    }
+
+    /// Shutdown FS
+    pub fn shutdown() -> usize {
+        let mut stream = UnixStream::connect(DEFAULT_SERVER1_SOCKET_PATH).unwrap();
+        stream.write_all(&[FS_OPS::SHUTDOWN as u8]).unwrap();
+        let mut response = String::new();
+        stream.read_to_string(&mut response).unwrap();
+        println!("{}", response);
+        0
     }
 }
