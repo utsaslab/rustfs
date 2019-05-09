@@ -1,6 +1,6 @@
 //! file system interface
 
-use crate::Device;
+use crate::device::Device;
 use nix::sys::signal::*;
 use nix::unistd::*;
 use std::fs;
@@ -104,7 +104,6 @@ async fn open() -> Result<(), Error> {
 
 #[allow(unused_variables)]
 async fn start_server2(poller: spdk_rs::io_channel::PollerHandle) {
-    
     let device = Device::new();
     let listener = match UnixListener::bind(DEFAULT_SERVER2_SOCKET_PATH) {
         Ok(sock) => sock,
@@ -116,12 +115,12 @@ async fn start_server2(poller: spdk_rs::io_channel::PollerHandle) {
     for stream in listener.incoming() {
         match stream {
             Ok(stream) => {
-                /// at least a async call to open can work but it is not right because we can now only handle one client at a time.
-                /// This might cause problem as if the application directly talks to server2, then there is only one socket available
-                /// and thus, the request first connected gets advantage: we always wait for its requests until it disconnected.
-                /// This limitation majorly due to our SPDK async has to poll on the current thread (i.e., cannot poll in different thread;
-                /// if so, we would use tokio). As for now, one possible solution is to use multiple sockets in non-blocking fashion and terminates socket connection on close
-                /// If we use two servers architecture, then server1 can help with synchronize (e.g., open on the same file will be queued)
+                // at least a async call to open can work but it is not right because we can now only handle one client at a time.
+                // This might cause problem as if the application directly talks to server2, then there is only one socket available
+                // and thus, the request first connected gets advantage: we always wait for its requests until it disconnected.
+                // This limitation majorly due to our SPDK async has to poll on the current thread (i.e., cannot poll in different thread;
+                // if so, we would use tokio). As for now, one possible solution is to use multiple sockets in non-blocking fashion and terminates socket connection on close
+                // If we use two servers architecture, then server1 can help with synchronize (e.g., open on the same file will be queued)
                 let stream = BufReader::new(stream);
                 for line in stream.lines() {
                     match line.unwrap().as_str() {
