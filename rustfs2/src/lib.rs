@@ -15,6 +15,7 @@ extern crate bincode;
 extern crate serde_derive;
 extern crate serde;
 
+mod device;
 mod constants;
 mod fs;
 
