@@ -9,6 +9,7 @@ use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::Path;
 use std::process;
 use std::thread;
+use failure::Error;
 
 use crate::constants::{DEFAULT_SERVER1_SOCKET_PATH, DEFAULT_SERVER2_SOCKET_PATH, FS_SHUTDOWN, FS_OPEN};
 
@@ -47,11 +48,10 @@ impl message {
 fn handle_client(stream: UnixStream) -> FS_OPS {
     let stream = BufReader::new(stream);
     for line in stream.lines() {
-        let content = line.unwrap().as_str();
-        match content {
+        match line.unwrap().as_str() {
             FS_SHUTDOWN => return FS_OPS::SHUTDOWN,
             FS_OPEN => {
-                println!("{}", content);
+                FS_OPS::OPEN
             }
             _ => FS_OPS::UNSUPPORTED
         };
@@ -85,10 +85,17 @@ fn handle_server1(stream: UnixStream) -> FS_OPS {
     for line in stream.lines() {
         match line.unwrap().as_str() {
             FS_SHUTDOWN => return FS_OPS::SHUTDOWN,
+            FS_OPEN => {
+                FS_OPS::OPEN
+            },
             _ => FS_OPS::UNSUPPORTED,
         };       
     }
     FS_OPS::NO_OP
+}
+
+async fn open() -> Result<(), Error> {
+    unimplemented!();
 }
 
 #[allow(unused_variables)]
@@ -103,12 +110,21 @@ async fn start_server2(poller: spdk_rs::io_channel::PollerHandle) {
     for stream in listener.incoming() {
         match stream {
             Ok(stream) => {
-                let handle = thread::spawn(|| handle_server1(stream));
-                let res = handle.join().unwrap();
-                dbg!(res);
-                if res == FS_OPS::SHUTDOWN {
-                    break;
+                let stream = BufReader::new(stream);
+                for line in stream.lines() {
+                    match line.unwrap().as_str() {
+                        FS_OPEN => {
+                            await!(open());
+                        },
+                        _ => {}
+                    };
                 }
+                // let handle = thread::spawn(|| handle_server1(stream));
+                // let res = handle.join().unwrap();
+                // dbg!(res);
+                // if res == FS_OPS::SHUTDOWN {
+                //     break;
+                // }
             }
             Err(err) => {
                 println!("Error: {}", err);
@@ -178,7 +194,6 @@ impl FS {
     pub fn open() -> usize {
         let mut stream = UnixStream::connect(DEFAULT_SERVER1_SOCKET_PATH).unwrap();
         stream.write_all(FS_OPEN.as_bytes()).unwrap();
-        stream.wrtie_all(b"hello world").unwrap();
         0
     }
 
