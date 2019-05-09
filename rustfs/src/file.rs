@@ -31,7 +31,7 @@ pub struct FileHandle<'r> {
 // Preserve this and write to disk?
 #[derive(Clone)]
 pub struct DirectoryContent<'r> {
-    pub entries: HashMap<&'r str, File<'r>>,
+    pub entries: Option<HashMap<&'r str, File<'r>>>,
     pub inode: Inode,
 }
 
@@ -71,7 +71,7 @@ impl<'r> File<'r> {
         DataFile(inode)
     }
 
-    pub fn get_dir(&self) -> Inode {
+    pub fn get_dir_inode(&self) -> Inode {
         match self {
             &Directory(dir_content) => dir_content.inode,
             _ => panic!("not a directory"),
