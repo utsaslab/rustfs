@@ -19,11 +19,11 @@ pub enum BitmapErr {
 
 pub struct Bitmap {
     bitmap: Vec<u8>,
-    offset: u64, // base offset on SSD
+    offset: usize, // base offset on SSD
 }
 
 impl Bitmap {
-    pub fn new(offset: u64, size: usize) -> Bitmap {
+    pub fn new(offset: usize, size: usize) -> Bitmap {
         Bitmap {
             bitmap: vec![0; size],
             offset: offset,
@@ -44,7 +44,7 @@ impl Bitmap {
     }
 
     // find and set
-    fn find(&mut self) -> Result<usize, Error> {
+    pub fn find(&mut self) -> Result<usize, Error> {
         for byte in &mut self.bitmap {
             if !(*byte) != 0 {
                 let mut mask = 1;
@@ -63,14 +63,14 @@ impl Bitmap {
 }
 
 pub struct FS<'r> {
-    device: Device,
+    pub device: Device,
     //    data_bitmap_base: usize,
     //    inode_bitmap_base: usize,
-    inode_base: usize,
-    data_base: usize,
-    inode_bitmap: Bitmap,
-    data_bitmap: Bitmap,
-    root: Option<File<'r>>,
+    pub inode_base: usize,
+    pub data_base: usize,
+    pub inode_bitmap: Bitmap,
+    pub data_bitmap: Bitmap,
+    pub root: Option<File<'r>>,
 }
 
 impl<'r> FS<'r> {
@@ -89,32 +89,32 @@ impl<'r> FS<'r> {
 
     pub fn alloc_block(&mut self) -> usize {
         let index = &self.data_bitmap.find()?;
-        let offset = index * &self.device.blk_size + &self.data_base;
+        let offset = index * &self.device.blk_size() + &self.data_base;
         let zero_buf =
-            spdk_rs::env::dma_zmalloc(&self.device.blk_size as usize, &self.device.buf_align);
+            spdk_rs::env::dma_zmalloc(self.device.blk_size(), self.device.buf_align);
         &mut self
             .device
-            .write(&mut zero_buf, offset, &self.device.blk_size);
+            .write(&mut zero_buf, offset, &self.device.blk_size());
         offset / &self.device.blk_size
     }
 
     pub fn mkfs(&mut self) {
         let zero_buf =
-            spdk_rs::env::dma_zmalloc(&self.device.blk_size as usize, &self.device.buf_align);
+            spdk_rs::env::dma_zmalloc(self.device.blk_size(), self.device.buf_align);
         let &mut write_buf =
-            spdk_rs::env::dma_zmalloc(&self.device.blk_size as usize, &self.device.buf_align);
-        write_buf.fill(&self.device.blk_size as usize, "%s", "RustFS--");
-        &mut self.device.write(&write_buf, 0, &self.device.blk_size);
+            spdk_rs::env::dma_zmalloc(self.device.blk_size(), self.device.buf_align);
+        write_buf.fill(self.device.blk_size, "%s", "RustFS--");
+        &mut self.device.write(&write_buf, 0, self.device.blk_size());
 
         // Define - root lives in first inode
         let byte:[u8;1] = [1;1];
-        write_buf.fill_bytes(&self.device.blk_size as usize, "%s", byte[..]);
+        write_buf.fill_bytes(self.device.blk_size(), "%s", byte[..]);
         &mut self
             .device
-            .write(&write_buf, &self.device.blk_size, &self.device.blk_size);
+            .write(&write_buf, self.device.blk_size(), self.device.blk_size());
         &mut self
             .device
-            .write(&zero_buf, 2 * &self.device.blk_size, &self.device.blk_size);
+            .write(&zero_buf, 2 * self.device.blk_size(), self.device.blk_size());
         let root_inode = inode::Inode::new(&mut self, DIR_TYPE, 0);
         root_inode.get_or_alloc_page(0);
         root_inode.write_inode();
@@ -122,19 +122,19 @@ impl<'r> FS<'r> {
     }
 
     pub fn mount(&mut self) {
-        let &mut read_buf =
-            spdk_rs::env::dma_zmalloc(&self.device.blk_size as usize, &self.device.buf_align);
+        let mut read_buf =
+            spdk_rs::env::dma_zmalloc(self.device.blk_size(), self.device.buf_align);
         &mut self
             .device
-            .read(&read_buf, &self.device.blk_size, &self.device.blk_size);
-        self.inode_bitmap.bitmap = read_buf.read();
+            .read(&mut read_buf, self.device.blk_size(), self.device.blk_size());
+        self.inode_bitmap.bitmap.copy_from_slice(read_buf.read_bytes(self.device.blk_size()));
         &mut self
             .device
-            .read(&read_buf, 2 * &self.device.blk_size, &self.device.blk_size);
-        self.data_bitmap.bitmap = read_buf.read();
+            .read(&mut read_buf, 2 * self.device.blk_size(), self.device.blk_size());
+        self.data_bitmap.bitmap.copy_from_slice(read_buf.read_bytes(self.device.blk_size()));
         &mut self
             .device
-            .read(&read_buf, 3 * &self.device.blk_size, &self.device.blk_size);
+            .read(&mut read_buf, 3 * self.device.blk_size(), self.device.blk_size());
         let root_inode:Inode;
         root_inode.read_inode();
     }

@@ -139,7 +139,7 @@ impl<'r> DirectoryHandle<'r> for File<'r> {
             Some(hm) => hm,
         };
         let iters = entry_map.len();
-        let mut write_buf:Vec<u8> = vec![0, iters * 128];
+        let mut write_buf:Vec<u8> = vec![0; iters * 128];
         let mut start = 0;
         for (name, curr_file) in &entry_map { 
             let curr_inum = match curr_file {
@@ -155,6 +155,6 @@ impl<'r> DirectoryHandle<'r> for File<'r> {
                 tmp.copy_from_slice(&slice[0..120]);
             }
         }
-        dc.inode.write(0, write_buf);
+        dc.inode.write(0, &write_buf);
     }
 }

@@ -17,7 +17,7 @@ use std::rc::Rc;
 // point to these guys instead of directly to Inodes/Directories
 #[derive(Clone)]
 pub enum File<'r> {
-    DataFile(Inode),
+    DataFile(Inode<'r>),
     Directory(DirectoryContent<'r>),
     EmptyFile,
 }
@@ -32,7 +32,7 @@ pub struct FileHandle<'r> {
 #[derive(Clone)]
 pub struct DirectoryContent<'r> {
     pub entries: Option<HashMap<&'r str, File<'r>>>,
-    pub inode: Inode,
+    pub inode: Inode<'r>,
 }
 
 pub enum Whence {
@@ -64,11 +64,13 @@ impl<'r> File<'r> {
         // // }
 
         // dir
+        unimplemented!();
     }
 
     pub fn new_data_file(inode: Inode) -> File<'r> {
         // TODO: write to disk ??
-        DataFile(inode)
+        DataFile(inode);
+        unimplemented!();
     }
 
     pub fn get_dir_inode(&self) -> Inode {

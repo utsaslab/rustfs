@@ -10,8 +10,8 @@ use spdk_rs::thread::SpdkIoChannel;
 pub struct Device {
     desc: SpdkBdevDesc,
     io_channel: SpdkIoChannel,
-    buf_align: usize,
-    blk_size: u32,
+    pub buf_align: usize,
+    blk_size: usize,
 }
 
 impl Device {
@@ -33,7 +33,7 @@ impl Device {
         }
     }
     // nbytes = blk_size?
-    fn read(&self, read_buf: &mut env::Buf, offset: u64, nbytes: u64) -> Result<usize, Error> {
+    pub fn read(&self, read_buf: &mut env::Buf, offset: usize, nbytes: usize) -> Result<usize, Error> {
         await!(bdev::read(
             self.desc.clone(),
             &self.io_channel,
@@ -43,7 +43,7 @@ impl Device {
         ))
     }
 
-    fn write(&self, write_buf: &env::Buf, offset: u64, nbytes: u64) -> Result<usize, Error> {
+    pub fn write(&self, write_buf: &env::Buf, offset: usize, nbytes: usize) -> Result<usize, Error> {
         await!(bdev::write(
             self.desc.clone(),
             &self.io_channel,
@@ -53,7 +53,7 @@ impl Device {
         ))
     }
 
-    fn blk_size(&self) -> u32 {
+    pub fn blk_size(&self) -> usize {
         self.blk_size
     }
 }

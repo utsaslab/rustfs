@@ -31,7 +31,7 @@ pub type FileDescriptor = isize;
 pub static mut fs: FS = FS::new();
 
 pub struct Proc<'r> {
-    fs: FS<'r>,
+    fs: &'r FS<'r>,
     cwd: File<'r>,
     fd_table: HashMap<FileDescriptor, FileHandle<'r>>,
     fds: Vec<FileDescriptor>,
@@ -40,8 +40,8 @@ pub struct Proc<'r> {
 impl<'r> Proc<'r> {
     pub fn new(file_system: &mut FS) -> Proc<'r> {
         Proc {
-            file_system,
-            cwd: FS::root(),
+            fs: file_system,
+            cwd: file_system.root,
             fd_table: HashMap::new(),
             fds: (0..(256 - 2)).map(|i| 256 - i).collect(),
         }
@@ -61,7 +61,7 @@ impl<'r> Proc<'r> {
             Some(f) => f,
             None => {
                 if (flags & O_CREAT) != 0 {
-                    let inum = &self.fs.inode_bitmap.find()?;
+                    let inum = self.fs.inode_bitmap.find()?;
                     let inode = Inode::new(&self.fs, FILE_TYPE, inum);
                     let file = File::new_data_file(inode);
                     // TODO: write to disk here
