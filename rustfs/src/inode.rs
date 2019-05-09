@@ -31,10 +31,10 @@ pub fn create_tlist<T>() -> TList<T> {
 }
 
 pub struct Inode<'r> {
-    fs: &'r FS<'r>,
+    pub fs: &'r FS<'r>,
     pub inum: usize,
 
-    dirtype: usize,
+    pub dirtype: usize,
     single: Option<usize>,
     double: Option<usize>,
     size: usize,
@@ -57,7 +57,7 @@ impl<'r> Inode<'r> {
         let blk = offset / BLOCK_SIZE;
         let blk_offset = offset % BLOCK_SIZE;
         let mut read_buf = spdk_rs::env::dma_zmalloc(BLOCK_SIZE, 0);
-        self.fs.device.read(read_buf, blk, BLOCK_SIZE);
+        self.fs.device.read(&mut read_buf, blk, BLOCK_SIZE);
         let mut buf = read_buf.read_bytes(BLOCK_SIZE);
         let mut content = &buf[blk_offset..blk_offset + INODE_SIZE];
         unsafe {
@@ -88,7 +88,7 @@ impl<'r> Inode<'r> {
         let blk = offset / BLOCK_SIZE;
         let blk_offset = offset % BLOCK_SIZE;
         let mut read_buf = spdk_rs::env::dma_zmalloc(BLOCK_SIZE, 0);
-        self.fs.device.read(read_buf, blk, BLOCK_SIZE);
+        self.fs.device.read(&mut read_buf, blk, BLOCK_SIZE);
         let mut buf = read_buf.read_bytes(BLOCK_SIZE);
         let mut content = &buf[blk_offset..blk_offset + INODE_SIZE];
         unsafe {
@@ -119,20 +119,20 @@ impl<'r> Inode<'r> {
         let page = if num == 0 {
             if self.single.is_none() {
                 //                if self.size == 0 {
-                self.single = &mut self.fs.alloc_block();
+                self.single = Some(self.fs.alloc_block());
                 need_update = true;
                 //                }else{
                 //                    &mut self.read_inode();
                 //                }
             }
-            self.single
+            self.single.unwrap()
         } else {
             // if the page num is in the doubly-indirect list. We allocate a new
             // entry list where necessary (*entry_list = ...)
             let index = num - 1;
             if self.double.is_none() {
                 //                if self.size <= BLOCK_SIZE {
-                self.double = &mut self.fs.alloc_block();
+                self.double = Some(self.fs.alloc_block());
                 need_update = true;
                 //                }else{
                 //                }

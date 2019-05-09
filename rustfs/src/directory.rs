@@ -26,14 +26,14 @@ impl<'r> DirectoryHandle<'r> for File<'r> {
 
     fn insert(&mut self, name: &'r str, file: File<'r>) {
         let dc = match self{
-             &Directory(dir_content) => dir_content,
+             &mut Directory(dir_content) => dir_content,
              _ => panic!("not a dir"),
         };
         match dc.entries {
              None => { 
                  &self.read_dir();
                  dc = match self {
-                    &Directory(dir_content) => dir_content,
+                    &mut Directory(dir_content) => dir_content,
                     _ => panic!("not a dir"),
                  }
              },
@@ -41,19 +41,19 @@ impl<'r> DirectoryHandle<'r> for File<'r> {
          };
         // TODO: check whether name already exists
         dc.entries.unwrap().insert(name, file);
-        &self.write_dir();
+        self.write_dir();
     }
 
     fn remove(&mut self, name: &'r str) {
         let dc = match self{
-             &Directory(dir_content) => dir_content,
+             &mut Directory(dir_content) => dir_content,
              _ => panic!("not a dir"),
         };
         match dc.entries {
              None => { 
                  &self.read_dir();
                  dc = match self {
-                    &Directory(dir_content) => dir_content,
+                    &mut Directory(dir_content) => dir_content,
                     _ => panic!("not a dir"),
                  }
              },
@@ -95,20 +95,20 @@ impl<'r> DirectoryHandle<'r> for File<'r> {
     // read from disk
     fn read_dir(&mut self){
         let mut dc = match self{
-             &Directory(dir_content) => dir_content,
+             &mut Directory(dir_content) => dir_content,
              _ => panic!("not a dir"),
         };
         let entry_map = match dc.entries {
             None => HashMap::new(),
             Some(hm) => hm,
         };
-        let data:Vec<u8> = vec![0; dc.inode.size]; 
+        let data:Vec<u8> = vec![0; dc.inode.size()]; 
         let slice = &mut data[..];
         dc.inode.read(0, &mut slice);
-        let iters:usize = dc.inode.size / 128;
+        let iters:usize = dc.inode.size() / 128;
         for i in 0..(iters+1) {
             let inum: usize;
-            let name: str;
+            let name: &str;
             let start = 128 * iters;
             unsafe{
                 inum = mem::transmute::<[u8; 8], usize>(*array_ref![slice, start, 8]);
@@ -116,14 +116,14 @@ impl<'r> DirectoryHandle<'r> for File<'r> {
             }
             let curr_inode = Inode::new(dc.inode.fs, 0, inum);
             curr_inode.read_inode();
-            let curr_file = match curr_inode.dir_type {
+            let curr_file = match curr_inode.dirtype {
                 DIR_TYPE => Directory(DirectoryContent{
                     entries: None,
                     inode: curr_inode,
                 }),
                 FILE_TYPE => DataFile(curr_inode),
             };
-            entry_map.insert(name, curr_file);
+            entry_map.insert(&name, curr_file);
         }
         *dc.entries = Some(entry_map);
     }
@@ -147,11 +147,15 @@ impl<'r> DirectoryHandle<'r> for File<'r> {
                 Directory(dirc) => dirc.inode.inum,
             };
             unsafe{
-                let tmp = &mut write_buf[start..(start+8)];
+                // TODO: array_ref?
+                let mut tmp = &mut write_buf[start..(start+8)];
                 let slice = mem::transmute::<usize, [u8; 8]>(curr_inum);
                 tmp.copy_from_slice(&slice[0..8]);
-                let tmp = &mut write_buf[(start+8)..(start+128)];
-                let slice = mem::transmute::<str, [u8; 8]>(name);
+                let mut tmp = &mut write_buf[(start+8)..(start+128)];
+                let slice = name.as_bytes();
+//                for i in 0..120 {
+//                    *tmp[]
+//                }
                 tmp.copy_from_slice(&slice[0..120]);
             }
         }

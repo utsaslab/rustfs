@@ -88,27 +88,27 @@ impl<'r> FS<'r> {
     }
 
     pub fn alloc_block(&mut self) -> usize {
-        let index = &self.data_bitmap.find()?;
+        let index = &self.data_bitmap.find().unwrap();
         let offset = index * &self.device.blk_size() + &self.data_base;
         let zero_buf =
             spdk_rs::env::dma_zmalloc(self.device.blk_size(), self.device.buf_align);
         &mut self
             .device
-            .write(&mut zero_buf, offset, &self.device.blk_size());
-        offset / &self.device.blk_size
+            .write(&mut zero_buf, offset, self.device.blk_size());
+        offset / self.device.blk_size()
     }
 
     pub fn mkfs(&mut self) {
         let zero_buf =
             spdk_rs::env::dma_zmalloc(self.device.blk_size(), self.device.buf_align);
-        let &mut write_buf =
+        let mut write_buf =
             spdk_rs::env::dma_zmalloc(self.device.blk_size(), self.device.buf_align);
-        write_buf.fill(self.device.blk_size, "%s", "RustFS--");
+        write_buf.fill(self.device.blk_size(), "%s", "RustFS--");
         &mut self.device.write(&write_buf, 0, self.device.blk_size());
 
         // Define - root lives in first inode
         let byte:[u8;1] = [1;1];
-        write_buf.fill_bytes(self.device.blk_size(), "%s", byte[..]);
+        write_buf.fill_bytes(&byte[..]);
         &mut self
             .device
             .write(&write_buf, self.device.blk_size(), self.device.blk_size());
@@ -118,7 +118,7 @@ impl<'r> FS<'r> {
         let root_inode = inode::Inode::new(&mut self, DIR_TYPE, 0);
         root_inode.get_or_alloc_page(0);
         root_inode.write_inode();
-        &self.make_root(&root_inode);
+        self.make_root(root_inode);
     }
 
     pub fn mount(&mut self) {
@@ -137,14 +137,15 @@ impl<'r> FS<'r> {
             .read(&mut read_buf, 3 * self.device.blk_size(), self.device.blk_size());
         let root_inode:Inode;
         root_inode.read_inode();
+        self.make_root(root_inode);
     }
 
-    fn make_root(&self, root_inode: &Inode) {
+    fn make_root(&self, root_inode: Inode<'r>) {
         let dir_content = DirectoryContent {
             entries: None,
             inode: root_inode,
         };
-        &self.root = Directory(dir_content);
+        self.root = Some(Directory(dir_content));
     }
     /*
     pub fn find(String path){
