@@ -1,12 +1,12 @@
+use crate::bitmap;
+
+use crate::constants::{BLOCK_SIZE, INODE_SIZE, LIST_SIZE};
+use bitmap::FS;
 use std::mem;
 use std::ptr;
 use std::ptr::copy_nonoverlapping;
 use time;
 use time::Timespec;
-
-const BLOCK_SIZE: usize = 512;
-const LIST_SIZE: usize = 16;
-pub const INODE_SIZE: usize = 32;
 
 type Page = Box<([u8; BLOCK_SIZE])>;
 type Entry = Page;
@@ -119,20 +119,20 @@ impl Inode {
         let page = if num == 0 {
             if &self.single.is_none() {
                 //                if &self.size == 0 {
-                single = &mut self.fs.alloc_block();
+                self.single = &mut self.fs.alloc_block();
                 need_update = true;
                 //                }else{
                 //                    &mut self.read_inode();
                 //                }
             }
-            single
+            self.single
         } else {
             // if the page num is in the doubly-indirect list. We allocate a new
             // entry list where necessary (*entry_list = ...)
             let index = num - 1;
             if &self.double.is_none() {
                 //                if &self.size <= BLOCK_SIZE {
-                double = &mut self.fs.alloc_block();
+                self.double = &mut self.fs.alloc_block();
                 need_update = true;
                 //                }else{
                 //                }
@@ -250,7 +250,7 @@ impl Inode {
 
             let page = self.get_page(start + i);
             let pg_offset = self.fs.data_base + page * BLOCK_SIZE;
-            let mut read_buf = spdk_rs::env::dma_zmalloc(blk_size as usize, 0);
+            let mut read_buf = spdk_rs::env::dma_zmalloc(self.device.blk_size as usize, 0);
             &self.fs.device.read(&mut read_buf, pg_offset, BLOCK_SIZE);
             let disk_page = read_buf.read_bytes();
             // TODO: check compatability here

@@ -1,7 +1,9 @@
 use self::File::{DataFile, Directory};
 
+use crate::constants;
 use crate::inode;
 
+use constants::DIR_TYPE;
 use inode::Inode;
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
@@ -41,45 +43,45 @@ pub enum Whence {
 
 impl<'r> File<'r> {
     pub fn new_dir(_parent: Option<File<'r>>) -> File<'r> {
-        let content = DirectoryContent {
-            entries: HashMap::new(),
-            inode: Inode(fs, DIR_TYPE, inum),
-        };
-        //        let rc = Rc::new(RefCell::new(content));
-        let dir = Directory(content);
-        // TODO: write to disk here ?? 
+        // let content = DirectoryContent {
+        //     entries: HashMap::new(),
+        //     inode: Inode { fs, DIR_TYPE, inum },
+        // };
+        // //        let rc = Rc::new(RefCell::new(content));
+        // let dir = Directory(content);
+        // // TODO: write to disk here ??
 
-        // Note that dir is RCd, so this is cheap
-        // Used to borrow dir and mut_dir at "same time"
-        // RefCell makes sure we're not doing anything wrong
-        // let mut mut_dir = dir.clone();
+        // // Note that dir is RCd, so this is cheap
+        // // Used to borrow dir and mut_dir at "same time"
+        // // RefCell makes sure we're not doing anything wrong
+        // // let mut mut_dir = dir.clone();
 
-        // // Setting up "." and ".."
-        // mut_dir.insert(".", dir.clone());
-        // match parent {
-        //   None => mut_dir.insert("..", dir.clone()),
-        //   Some(f) => mut_dir.insert("..", f)
-        // }
+        // // // Setting up "." and ".."
+        // // mut_dir.insert(".", dir.clone());
+        // // match parent {
+        // //   None => mut_dir.insert("..", dir.clone()),
+        // //   Some(f) => mut_dir.insert("..", f)
+        // // }
 
-        dir
+        // dir
     }
 
     pub fn new_data_file(inode: Inode) -> File<'r> {
         // TODO: write to disk ??
         DataFile(inode)
     }
-    
+
     pub fn get_dir(&self) -> Inode {
         match self {
             &Directory(dir_content) => dir_content.inode,
-            _ => panic!("not a directory")
+            _ => panic!("not a directory"),
         }
     }
 
     pub fn get_inode(&self) -> Inode {
         match self {
             &DataFile(inode) => inode,
-            _ => panic!("not a directory")
+            _ => panic!("not a directory"),
         }
     }
 }
@@ -112,14 +114,15 @@ impl<'r> FileHandle<'r> {
     }
 
     pub fn seek(&mut self, offset: isize, whence: Whence) -> usize {
-        let seek = self.seek.get();
-        let new_seek = match whence {
-            Whence::SeekSet => offset as usize,
-            Whence::SeekCur => (seek as isize + offset) as usize,
-            Whence::SeekEnd => (inode_rc.borrow().size() as isize + offset) as usize,
-        };
+        // let seek = self.seek.get();
+        // let new_seek = match whence {
+        //     Whence::SeekSet => offset as usize,
+        //     Whence::SeekCur => (seek as isize + offset) as usize,
+        //     Whence::SeekEnd => (inode_rc.borrow().size() as isize + offset) as usize,
+        // };
 
-        self.seek.set(new_seek);
-        new_seek
+        // self.seek.set(new_seek);
+        // new_seek
+        unimplemented!();
     }
 }

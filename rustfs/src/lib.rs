@@ -16,6 +16,7 @@ mod file;
 mod inode;
 
 use bitmap::FS;
+use constants::{FILE_TYPE, O_CREAT};
 use directory::DirectoryHandle;
 use file::File::{DataFile, Directory, EmptyFile};
 use file::{File, FileHandle};
@@ -28,13 +29,6 @@ pub use inode::Inode;
 
 pub type FileDescriptor = isize;
 pub static mut fs: FS = FS::new();
-
-// pub const O_RDONLY: u32 = (1 << 0);
-// pub const O_WRONLY: u32 = (1 << 1);
-// pub const O_RDWR: u32 = (1 << 2);
-// pub const O_NONBLOCK: u32 = (1 << 3);
-// pub const O_APPEND: u32 = (1 << 4);
-// pub const O_CREAT: u32 = (1 << 5);
 
 pub struct Proc<'r> {
     fs: FS,
@@ -73,9 +67,9 @@ impl<'r> Proc<'r> {
                     // TODO: write to disk here
                     self.cwd.insert(path, file.clone());
                     inode.write_inode();
-                    match self.cwd{
-                        Directory(dc) => dc.inode.write_inode();
-                        _ => ;
+                    match self.cwd {
+                        Directory(dc) => dc.inode.write_inode(),
+                        _ => {}
                     }
                     file
                 } else {
