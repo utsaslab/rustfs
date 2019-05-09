@@ -4,9 +4,11 @@ use crate::file;
 use crate::inode;
 
 use constants::{BLOCK_SIZE, DIR_TYPE, INODE_SIZE};
+use crate::file::DirectoryContent;
 use device::Device;
 use failure::Error;
 use file::File;
+use file::File::Directory;
 use inode::Inode;
 
 #[derive(Debug, Fail)]
@@ -60,7 +62,7 @@ impl Bitmap {
     }
 }
 
-pub struct FS {
+pub struct FS<'r> {
     device: Device,
     //    data_bitmap_base: usize,
     //    inode_bitmap_base: usize,
@@ -68,11 +70,11 @@ pub struct FS {
     data_base: usize,
     inode_bitmap: Bitmap,
     data_bitmap: Bitmap,
-    root: Option<File>,
+    root: Option<File<'r>>,
 }
 
-impl FS {
-    pub fn new() -> FS {
+impl<'r> FS<'r> {
+    pub fn new() -> FS<'r> {
         let device = Device::new();
         let blk_size = device.blk_size();
         FS {
@@ -105,8 +107,8 @@ impl FS {
         &mut self.device.write(&write_buf, 0, &self.device.blk_size);
 
         // Define - root lives in first inode
-        let byte: u8 = 1;
-        write_buf.fill(&self.device.blk_size as usize, "%s", byte.to_string());
+        let byte:[u8;1] = [1;1];
+        write_buf.fill_bytes(&self.device.blk_size as usize, "%s", byte[..]);
         &mut self
             .device
             .write(&write_buf, &self.device.blk_size, &self.device.blk_size);
@@ -116,9 +118,7 @@ impl FS {
         let root_inode = inode::Inode::new(&mut self, DIR_TYPE, 0);
         root_inode.get_or_alloc_page(0);
         root_inode.write_inode();
-        &mut self
-            .device
-            .write(&write_buf, 3 * &self.device.blk_size, &self.device.blk_size);
+        &self.make_root(&root_inode);
     }
 
     pub fn mount(&mut self) {
@@ -139,12 +139,12 @@ impl FS {
         root_inode.read_inode();
     }
 
-    fn make_root(&self, root_inode: Inode) {
+    fn make_root(&self, root_inode: &Inode) {
         let dir_content = DirectoryContent {
-            entries: HashMap::new(),
-            
+            entries: None,
+            inode: root_inode,
         };
-         File::Directory(&self.root.unwrap())
+        &self.root = Directory(dir_content);
     }
     /*
     pub fn find(String path){

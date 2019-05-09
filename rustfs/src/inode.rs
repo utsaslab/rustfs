@@ -30,8 +30,8 @@ pub fn create_tlist<T>() -> TList<T> {
     list
 }
 
-pub struct Inode {
-    fs: &FS,
+pub struct Inode<'r> {
+    fs: &FS<'r>,
     inum: usize,
 
     dirtype: usize,
@@ -40,7 +40,7 @@ pub struct Inode {
     size: usize,
 }
 
-impl Inode {
+impl<'r> Inode<'r> {
     pub fn new(fs: &FS, dirtype: usize, inum: usize) -> Inode {
         Inode {
             fs: fs,

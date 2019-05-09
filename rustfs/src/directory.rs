@@ -1,13 +1,19 @@
 use crate::file;
 
+use crate::inode::Inode;
 use file::File;
-use file::File::Directory;
+use file::File::{Directory, DataFile};
+use file::DirectoryContent;
+use std::collections::HashMap;
+use std::mem;
 
 pub trait DirectoryHandle<'r>: Sized {
     fn is_dir(&self) -> bool;
     fn insert(&mut self, name: &'r str, file: Self);
     fn remove(&mut self, name: &'r str);
     fn get(&self, name: &'r str) -> Option<Self>;
+    fn read_dir(&mut self);
+    fn write_dir(&self);
 }
 
 impl<'r> DirectoryHandle<'r> for File<'r> {
@@ -31,7 +37,7 @@ impl<'r> DirectoryHandle<'r> for File<'r> {
                     _ => panic!("not a dir"),
                  }
              },
-             _ => ,
+             _ => {},
          };
         // TODO: check whether name already exists
         dc.entries.unwrap().insert(name, file);
@@ -51,7 +57,7 @@ impl<'r> DirectoryHandle<'r> for File<'r> {
                     _ => panic!("not a dir"),
                  }
              },
-             _ => ,
+             _ => {},
          };
         dc.entries.unwrap().remove(&name);
         &self.write_dir();
@@ -74,7 +80,7 @@ impl<'r> DirectoryHandle<'r> for File<'r> {
                     _ => panic!("not a dir"),
                  }
              },
-             _ => ,
+             _ => {},
          };
 
                   
@@ -87,7 +93,7 @@ impl<'r> DirectoryHandle<'r> for File<'r> {
     }
 
     // read from disk
-    fn read_dir(&self){
+    fn read_dir(&mut self){
         let mut dc = match self{
              &Directory(dir_content) => dir_content,
              _ => panic!("not a dir"),
@@ -108,15 +114,15 @@ impl<'r> DirectoryHandle<'r> for File<'r> {
                 inum = mem::transmute::<[u8; 8], usize>(*array_ref![slice, start, 8]);
                 name = mem::transmute::<[u8; 120], str>(*array_ref![slice, start+8, 120]);
             }
-            let curr_inode = Inode(dc.inode.fs, 0, inum);
+            let curr_inode = Inode::new(dc.inode.fs, 0, inum);
             curr_inode.read_inode();
             let curr_file = match curr_inode.dir_type {
                 DIR_TYPE => Directory(DirectoryContent{
                     entries: None,
                     inode: curr_inode,
                 }),
-                FILE_TYPE => Datafile(curr_inode),
-            }
+                FILE_TYPE => DataFile(curr_inode),
+            };
             entry_map.insert(name, curr_file);
         }
         *dc.entries = Some(entry_map);
@@ -124,7 +130,7 @@ impl<'r> DirectoryHandle<'r> for File<'r> {
 
     // write to disk
     fn write_dir(&self) {
-        let mut dc = match self{
+        let dc = match self{
              &Directory(dir_content) => dir_content,
              _ => panic!("not a dir"),
         };

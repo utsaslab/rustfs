@@ -31,7 +31,7 @@ pub type FileDescriptor = isize;
 pub static mut fs: FS = FS::new();
 
 pub struct Proc<'r> {
-    fs: FS,
+    fs: FS<'r>,
     cwd: File<'r>,
     fd_table: HashMap<FileDescriptor, FileHandle<'r>>,
     fds: Vec<FileDescriptor>,
