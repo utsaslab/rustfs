@@ -1,0 +1,4 @@
+[build]
+rustflags = [
+  "-C", "link-arg=/home/zeyuanhu/spdk/build/lib/libspdk.so"
+]

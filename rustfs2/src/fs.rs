@@ -21,12 +21,14 @@ fn handle_client(stream: UnixStream) {
 }
 
 /// Handle the request from server1
-fn handle_server1(stream: UnixStream) {
+fn handle_server1(stream: UnixStream) -> i32 {
     let stream = BufReader::new(stream);
     for line in stream.lines() {
-        println!("{}", line.unwrap());
+        if line.unwrap() == "stop" {
+            return 1992;
+        }
     }
-    spdk_rs::event::app_stop(true);
+    0
 }
 
 #[allow(unused_variables)]
@@ -41,7 +43,12 @@ async fn start_server2(poller: spdk_rs::io_channel::PollerHandle) {
     for stream in listener.incoming() {
         match stream {
             Ok(stream) => {
-                thread::spawn(|| handle_server1(stream));
+                let handle = thread::spawn(|| handle_server1(stream));
+                let res = handle.join().unwrap();
+                dbg!(res);
+                if res == 1992 {
+                    break;
+                }
             }
             Err(err) => {
                 println!("Error: {}", err);
