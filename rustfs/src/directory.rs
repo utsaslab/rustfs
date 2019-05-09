@@ -147,18 +147,18 @@ impl<'r> DirectoryHandle<'r> for File<'r> {
                 DataFile(inode) => inode.inum,
                 Directory(dirc) => dirc.inode.inum,
             };
+            let mut this_entry = &mut write_buf[start..(start+128)];
             unsafe{
                 // TODO: array_ref?
-                let mut tmp = &mut write_buf[start..(start+8)];
-                let slice = mem::transmute::<usize, [u8; 8]>(curr_inum);
-                tmp.copy_from_slice(&slice[0..8]);
-                let mut tmp = &mut write_buf[(start+8)..(start+128)];
+                let tmp = mem::transmute::<usize, [u8; 8]>(curr_inum);
+                this_entry[0..8].copy_from_slice(&tmp[0..8]);
+//                let mut tmp = &mut write_buf[(start+8)..(start+128)];
 //                let slice = name.as_bytes();
-                let slice = mem::transmute::<&str, [u8; 120]>(name);
+                let tmp = mem::transmute::<&str, [u8; 120]>(name);
 //                for i in 0..120 {
 //                    *tmp[]
 //                }
-                tmp.copy_from_slice(&slice[0..120]);
+                this_entry[8..128].copy_from_slice(&slice[0..120]);
             }
         }
         dc.inode.write(0, &write_buf);
