@@ -20,6 +20,10 @@ enum FS_OPS {
     UNSUPPORTED,
 }
 
+/// message that is used to pass between
+/// server and client, server and server
+/// it contains all the necessary fields
+/// supported by FS calls
 struct message {
     ops: &'static str,
 }
@@ -180,6 +184,7 @@ impl FS {
 
     /// Shutdown FS
     pub fn shutdown() {
+        let msg = message::shutdown_msg();
         let mut stream = UnixStream::connect(DEFAULT_SERVER2_SOCKET_PATH).unwrap();
         stream.write_all(FS_SHUTDOWN.as_bytes()).unwrap();
         stream = UnixStream::connect(DEFAULT_SERVER1_SOCKET_PATH).unwrap();

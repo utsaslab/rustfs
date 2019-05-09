@@ -1,13 +1,4 @@
-/*************************************************************************
-  > File Name:       executor.rs
-  > Author:          Jakub Kozlowski (@jkozlowski)
-  > Mail:
-  > Created Time:    12/11/18
-  > Description:
-
-    The code from starfish (https://github.com/jkozlowski/starfish).
- ************************************************************************/
-
+//! Executor to provide future-based Framework on top of SPDK. Adapted from starfish (https://github.com/jkozlowski/starfish).
 extern crate futures;
 extern crate tokio;
 
