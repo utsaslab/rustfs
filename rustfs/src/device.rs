@@ -10,8 +10,8 @@ use spdk_rs::thread::SpdkIoChannel;
 pub struct Device {
     desc: SpdkBdevDesc,
     io_channel: SpdkIoChannel,
-    buf_align: usize,
-    blk_size: u32,
+    pub buf_align: usize,
+    blk_size: usize,
 }
 
 impl Device {
@@ -29,31 +29,40 @@ impl Device {
 
         match bdev::open(bdev.clone(), true, &mut desc) {
             Ok(_) => println!("Successfully open the device"),
-            _ => {}
+            _ => {},
+        };
+        let io_channel = spdk_rs::bdev::get_io_channel(desc.clone()).unwrap();
+        let blk_size = spdk_rs::bdev::get_block_size(bdev.clone());
+        let buf_align = spdk_rs::bdev::get_buf_align(bdev.clone());
+        Device {
+            desc: desc,
+            io_channel: io_channel,
+            buf_align: buf_align as usize,
+            blk_size: blk_size as usize,
         }
     }
     // nbytes = blk_size?
-    fn read(&self, read_buf: &mut env::Buf, offset: u64, nbytes: u64) -> Result<usize, Error> {
+    pub fn read(&self, read_buf: &mut env::Buf, offset: usize, nbytes: usize) -> Result<(), Error> {
         await!(bdev::read(
             self.desc.clone(),
             &self.io_channel,
             &mut read_buf,
-            offset,
-            nbytes
+            offset as u64,
+            nbytes as u64
         ))
     }
 
-    fn write(&self, write_buf: &env::Buf, offset: u64, nbytes: u64) -> Result<usize, Error> {
+    pub fn write(&self, write_buf: &env::Buf, offset: usize, nbytes: usize) -> Result<(), Error> {
         await!(bdev::write(
             self.desc.clone(),
             &self.io_channel,
             write_buf,
-            offset,
-            nbytes
+            offset as u64,
+            nbytes as u64
         ))
     }
 
-    fn blk_size(&self) -> u32 {
+    pub fn blk_size(&self) -> usize {
         self.blk_size
     }
 }
