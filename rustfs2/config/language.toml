@@ -1,0 +1,22 @@
+[common]
+# Mount point of SSD
+SSD_PATH = "/mnt/ssd/zeyuan"
+# Block device
+DEVICE = "/dev/nvme0n1"
+
+# Setup to measure the throughput
+[sequential_write]
+# Block size
+BS = "1G"
+# dd's `count=` (e.g. 120)
+COUNT = 1
+# dd's `dsync`
+oflag = "dsync"
+
+# Setup to verify the Rust + SPDK sequential write implementation
+[sequential_write_test]
+BS="10MB"
+
+
+# Setup to measure the latency
+[random_write]
