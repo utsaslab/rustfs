@@ -31,14 +31,14 @@ impl Device {
             Ok(_) => println!("Successfully open the device"),
             _ => {},
         };
-        let io_channel = spdk_rs::bdev::get_io_channel(desc.clone()):unwrap();
+        let io_channel = spdk_rs::bdev::get_io_channel(desc.clone()).unwrap();
         let blk_size = spdk_rs::bdev::get_block_size(bdev.clone());
         let buf_align = spdk_rs::bdev::get_buf_align(bdev.clone());
         Device {
-            desc,
-            io_channel,
-            buf_align as usize,
-            blk_size as usize,
+            desc: desc,
+            io_channel: io_channel,
+            buf_align: buf_align as usize,
+            blk_size: blk_size as usize,
         }
     }
     // nbytes = blk_size?
@@ -49,7 +49,7 @@ impl Device {
             &mut read_buf,
             offset as u64,
             nbytes as u64
-        )
+        ))
     }
 
     pub fn write(&self, write_buf: &env::Buf, offset: usize, nbytes: usize) -> Result<(), Error> {
@@ -59,7 +59,7 @@ impl Device {
             write_buf,
             offset as u64,
             nbytes as u64
-        )
+        ))
     }
 
     pub fn blk_size(&self) -> usize {

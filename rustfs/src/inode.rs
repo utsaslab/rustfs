@@ -30,6 +30,7 @@ pub fn create_tlist<T>() -> TList<T> {
     list
 }
 
+#[derive(Clone)]
 pub struct Inode<'r> {
     pub fs: &'r FS<'r>,
     pub inum: usize,

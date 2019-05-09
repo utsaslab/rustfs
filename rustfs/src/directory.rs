@@ -89,7 +89,8 @@ impl<'r> DirectoryHandle<'r> for File<'r> {
         //             Some(ref file) => Some((*file).clone()), // It's RC
 //             Some() =>
 //         }
-        dc.entries.unwrap().get(&name)
+//      Is it correct to clone??   
+        Some((*dc.entries.unwrap().get(&name).unwrap()).clone())
     }
 
     // read from disk
@@ -112,7 +113,7 @@ impl<'r> DirectoryHandle<'r> for File<'r> {
             let start = 128 * iters;
             unsafe{
                 inum = mem::transmute::<[u8; 8], usize>(*array_ref![slice, start, 8]);
-                name = mem::transmute::<[u8; 120], str>(*array_ref![slice, start+8, 120]);
+                name = mem::transmute::<[u8; 120], &str>(*array_ref![slice, start+8, 120]);
             }
             let curr_inode = Inode::new(dc.inode.fs, 0, inum);
             curr_inode.read_inode();
@@ -125,7 +126,7 @@ impl<'r> DirectoryHandle<'r> for File<'r> {
             };
             entry_map.insert(&name, curr_file);
         }
-        *dc.entries = Some(entry_map);
+        dc.entries = Some(entry_map);
     }
 
     // write to disk
@@ -152,7 +153,8 @@ impl<'r> DirectoryHandle<'r> for File<'r> {
                 let slice = mem::transmute::<usize, [u8; 8]>(curr_inum);
                 tmp.copy_from_slice(&slice[0..8]);
                 let mut tmp = &mut write_buf[(start+8)..(start+128)];
-                let slice = name.as_bytes();
+//                let slice = name.as_bytes();
+                let slice = mem::transmute::<&str, [u8; 120]>(name);
 //                for i in 0..120 {
 //                    *tmp[]
 //                }
