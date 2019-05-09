@@ -1,8 +1,6 @@
 //! file system interface
 use nix::sys::signal::*;
 use nix::unistd::*;
-use num_derive::FromPrimitive;
-use num_traits::FromPrimitive;
 use std::fs;
 use std::io::prelude::*;
 use std::io::{BufRead, BufReader};
@@ -12,27 +10,24 @@ use std::path::Path;
 use std::process;
 use std::thread;
 
-use crate::constants::{DEFAULT_SERVER1_SOCKET_PATH, DEFAULT_SERVER2_SOCKET_PATH};
+use crate::constants::{DEFAULT_SERVER1_SOCKET_PATH, DEFAULT_SERVER2_SOCKET_PATH, FS_SHUTDOWN};
 
-#[derive(PartialEq, Debug, Clone, Copy, FromPrimitive)]
+#[derive(PartialEq, Debug, Clone, Copy)]
 enum FS_OPS {
-    NO_OP = 0,
-    SHUTDOWN = 1,
-    OPEN = 2,
-    UNSUPPORTED = 3,
+    NO_OP,
+    SHUTDOWN,
+    OPEN,
+    UNSUPPORTED,
 }
 
 /// Handle the request from application
 fn handle_client(stream: UnixStream) -> FS_OPS {
     let stream = BufReader::new(stream);
     for line in stream.lines() {
-        match FromPrimitive::from_i32(line.unwrap().parse::<i32>().unwrap()) {
-            Some(FS_OPS::SHUTDOWN) => return FS_OPS::SHUTDOWN,
-            None => return FS_OPS::UNSUPPORTED,
-            Some(FS_OPS::OPEN) => unimplemented!(),
-            Some(FS_OPS::NO_OP) => {}
-            Some(FS_OPS::UNSUPPORTED) => return FS_OPS::UNSUPPORTED,
-        }
+        match line.unwrap().as_str() {
+            FS_SHUTDOWN => return FS_OPS::SHUTDOWN,
+            _ => FS_OPS::UNSUPPORTED
+        };
     }
     FS_OPS::NO_OP
 }
@@ -61,13 +56,10 @@ fn start_server1() {
 fn handle_server1(stream: UnixStream) -> FS_OPS {
     let stream = BufReader::new(stream);
     for line in stream.lines() {
-        match FromPrimitive::from_i32(line.unwrap().parse::<i32>().unwrap()) {
-            Some(FS_OPS::SHUTDOWN) => return FS_OPS::SHUTDOWN,
-            None => return FS_OPS::UNSUPPORTED,
-            Some(FS_OPS::OPEN) => unimplemented!(),
-            Some(FS_OPS::NO_OP) => {}
-            Some(FS_OPS::UNSUPPORTED) => return FS_OPS::UNSUPPORTED,
-        }
+        match line.unwrap().as_str() {
+            FS_SHUTDOWN => return FS_OPS::SHUTDOWN,
+            _ => FS_OPS::UNSUPPORTED,
+        };       
     }
     FS_OPS::NO_OP
 }
@@ -163,12 +155,11 @@ impl FS {
     }
 
     /// Shutdown FS
-    pub fn shutdown() -> usize {
-        let mut stream = UnixStream::connect(DEFAULT_SERVER1_SOCKET_PATH).unwrap();
-        stream.write_all(&[FS_OPS::SHUTDOWN as u8]).unwrap();
-        let mut response = String::new();
-        stream.read_to_string(&mut response).unwrap();
-        println!("{}", response);
-        0
+    pub fn shutdown() {
+        println!("enter here");
+        let mut stream = UnixStream::connect(DEFAULT_SERVER2_SOCKET_PATH).unwrap();
+        stream.write_all(FS_SHUTDOWN.as_bytes()).unwrap();
+        stream = UnixStream::connect(DEFAULT_SERVER1_SOCKET_PATH).unwrap();
+        stream.write_all(FS_SHUTDOWN.as_bytes()).unwrap();
     }
 }

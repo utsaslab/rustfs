@@ -11,3 +11,6 @@ pub const O_APPEND: u32 = (1 << 4);
 pub const O_CREAT: u32 = (1 << 5);
 pub const DEFAULT_SERVER1_SOCKET_PATH: &str = "/tmp/rustfs_server1.sock";
 pub const DEFAULT_SERVER2_SOCKET_PATH: &str = "/tmp/rustfs_server2.sock";
+
+/// Support FS operations
+pub const FS_SHUTDOWN: &str = "shutdown";

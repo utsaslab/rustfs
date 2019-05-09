@@ -10,9 +10,13 @@ export SPDK_INSTALL_DIR=$HOME/spdk_install
 export RUSTFLAGS="-C link-arg=$SPDK_INSTALL_DIR/lib/libspdk.so"
 
 # Logging level
-export RUSTFS_BENCHMARKS_LANGUAGE_LOG=debug
+export RUSTFS_EXAMPLES_LOG=debug
 
 # Whether to use memory (e.g., Malloc0) instead of NVMe disk for the benchmark
 export MALLOC0=0
 
-cargo run
+if [ $1 == "shutdown" ]; then
+    cargo run shutdown
+elif [ $1 == "mount" ]; then
+    cargo run mount
+fi

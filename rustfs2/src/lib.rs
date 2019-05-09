@@ -8,6 +8,8 @@ extern crate time;
 #[macro_use]
 extern crate failure;
 extern crate nix;
+#[macro_use]
+extern crate log;
 
 mod constants;
 mod fs;

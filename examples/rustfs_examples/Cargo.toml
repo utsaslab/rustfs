@@ -6,3 +6,4 @@ edition = "2018"
 
 [dependencies]
 rustfs2 = { path="../../rustfs2"}
+env_logger = "0.6.0"
