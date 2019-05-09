@@ -19,10 +19,23 @@ impl<'r> DirectoryHandle<'r> for File<'r> {
     }
 
     fn insert(&mut self, name: &'r str, file: File<'r>) {
-        //        let rc = self.get_dir_rc();
-        // let mut content = rc.borrow_mut();
-        // content.entries.insert(name, file);
-        unimplemented!();
+        let dc = match self{
+             &Directory(dir_content) => dir_content,
+             _ => panic!("not a dir"),
+        };
+        match dc.entries {
+             None => { 
+                 &self.read_dir();
+                 dc = match self {
+                    &Directory(dir_content) => dir_content,
+                    _ => panic!("not a dir"),
+                 }
+             },
+             _ => ,
+         };
+        // TODO: check whether name already exists
+        dc.entries.unwrap().insert(name, file);
+        &self.write_dir();
     }
 
     fn remove(&mut self, name: &'r str) {
@@ -40,6 +53,8 @@ impl<'r> DirectoryHandle<'r> for File<'r> {
              },
              _ => ,
          };
+        dc.entries.unwrap().remove(&name);
+        &self.write_dir();
         //        let rc = self.get_dir_rc();
         // let mut content = rc.borrow_mut();
         // content.entries.remove(&name);
