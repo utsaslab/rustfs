@@ -68,7 +68,7 @@ pub struct FS {
     data_base: usize,
     inode_bitmap: Bitmap,
     data_bitmap: Bitmap,
-    root: Inode,
+    root: Option<File>,
 }
 
 impl FS {
@@ -113,8 +113,9 @@ impl FS {
         &mut self
             .device
             .write(&zero_buf, 2 * &self.device.blk_size, &self.device.blk_size);
-        let root = inode::Inode::new(&mut self, DIR_TYPE, 0);
-        write_buf.fill(&self.device.blk_size as usize, "%s\n", root.to_string());
+        let root_inode = inode::Inode::new(&mut self, DIR_TYPE, 0);
+        root_inode.get_or_alloc_page(0);
+        root_inode.write_inode();
         &mut self
             .device
             .write(&write_buf, 3 * &self.device.blk_size, &self.device.blk_size);
@@ -134,13 +135,17 @@ impl FS {
         &mut self
             .device
             .read(&read_buf, 3 * &self.device.blk_size, &self.device.blk_size);
-        let inode = read_buf.read().to_string().parse::<Inode>().unwrap;
-        self.root = inode;
+        let root_inode:Inode;
+        root_inode.read_inode();
     }
 
-    // pub fn root(&self) -> File::DataFile {
-    //     File::Datafile(&self.root.unwrap())
-    // }
+    fn make_root(&self, root_inode: Inode) {
+        let dir_content = DirectoryContent {
+            entries: HashMap::new(),
+            
+        };
+         File::Directory(&self.root.unwrap())
+    }
     /*
     pub fn find(String path){
 
