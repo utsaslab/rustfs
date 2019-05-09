@@ -3,7 +3,7 @@ use crate::device;
 use crate::file;
 use crate::inode;
 
-use constants::DIR_TYPE;
+use constants::{BLOCK_SIZE, DIR_TYPE, INODE_SIZE};
 use device::Device;
 use failure::Error;
 use file::File;
@@ -78,7 +78,7 @@ impl FS {
         FS {
             device: device,
             inode_base: 3 * blk_size,
-            data_base: 3 * blk_size + inode::INODE_SIZE * blk_size * 8,
+            data_base: 3 * blk_size + INODE_SIZE * blk_size * 8,
             inode_bitmap: Bitmap::new(blk_size, blk_size),
             data_bitmap: Bitmap::new(2 * blk_size, blk_size),
             root: None,

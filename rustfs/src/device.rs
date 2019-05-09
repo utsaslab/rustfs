@@ -1,6 +1,7 @@
 //! A wrapper for device, which an abstraction for the underlying SPDK objects
 extern crate spdk_rs;
 
+use failure::Error;
 use spdk_rs::bdev;
 use spdk_rs::bdev::SpdkBdevDesc;
 use spdk_rs::env;
@@ -39,7 +40,7 @@ impl Device {
             &mut read_buf,
             offset,
             nbytes
-        ));
+        ))
     }
 
     fn write(&self, write_buf: &env::Buf, offset: u64, nbytes: u64) -> Result<usize, Error> {
@@ -49,7 +50,7 @@ impl Device {
             write_buf,
             offset,
             nbytes
-        ));
+        ))
     }
 
     fn blk_size(&self) -> u32 {
@@ -59,8 +60,8 @@ impl Device {
 
 impl Drop for Device {
     fn drop(&mut self) {
-        spdk_rs::thread::put_io_channel(io_channel);
-        bdev::close(desc);
+        spdk_rs::thread::put_io_channel(self.io_channel);
+        bdev::close(self.desc);
         spdk_rs::event::app_stop(true);
     }
 }

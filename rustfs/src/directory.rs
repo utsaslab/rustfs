@@ -19,26 +19,29 @@ impl<'r> DirectoryHandle<'r> for File<'r> {
     }
 
     fn insert(&mut self, name: &'r str, file: File<'r>) {
-//        let rc = self.get_dir_rc();
-        let mut content = rc.borrow_mut();
-        content.entries.insert(name, file);
+        //        let rc = self.get_dir_rc();
+        // let mut content = rc.borrow_mut();
+        // content.entries.insert(name, file);
+        unimplemented!();
     }
 
     fn remove(&mut self, name: &'r str) {
-//        let rc = self.get_dir_rc();
-        let mut content = rc.borrow_mut();
-        content.entries.remove(&name);
+        //        let rc = self.get_dir_rc();
+        // let mut content = rc.borrow_mut();
+        // content.entries.remove(&name);
+        unimplemented!();
     }
 
     fn get(&self, name: &'r str) -> Option<File<'r>> {
-//        let rc = self.get_dir_rc();
-        let content = match self{
-            &Directory(dir_content) => dir_content,
-        }
-        let content = rc.borrow();
-        match content.entries.get(&name) {
-            None => None,
-            Some(ref file) => Some((*file).clone()), // It's RC
-        }
+        // //        let rc = self.get_dir_rc();
+        //         let content = match self{
+        //             &Directory(dir_content) => dir_content,
+        //         }
+        //         let content = rc.borrow();
+        //         match content.entries.get(&name) {
+        //             None => None,
+        //             Some(ref file) => Some((*file).clone()), // It's RC
+        //         }
+        unimplemented!();
     }
 }
