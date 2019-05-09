@@ -10,6 +10,10 @@ extern crate failure;
 extern crate nix;
 #[macro_use]
 extern crate log;
+extern crate bincode;
+#[macro_use]
+extern crate serde_derive;
+extern crate serde;
 
 mod constants;
 mod fs;

@@ -14,3 +14,4 @@ pub const DEFAULT_SERVER2_SOCKET_PATH: &str = "/tmp/rustfs_server2.sock";
 
 /// Support FS operations
 pub const FS_SHUTDOWN: &str = "shutdown";
+pub const FS_OPEN: &str = "open";

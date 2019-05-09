@@ -10,7 +10,7 @@ use std::path::Path;
 use std::process;
 use std::thread;
 
-use crate::constants::{DEFAULT_SERVER1_SOCKET_PATH, DEFAULT_SERVER2_SOCKET_PATH, FS_SHUTDOWN};
+use crate::constants::{DEFAULT_SERVER1_SOCKET_PATH, DEFAULT_SERVER2_SOCKET_PATH, FS_SHUTDOWN, FS_OPEN};
 
 #[derive(PartialEq, Debug, Clone, Copy)]
 enum FS_OPS {
@@ -20,12 +20,35 @@ enum FS_OPS {
     UNSUPPORTED,
 }
 
+struct message {
+    ops: &'static str,
+}
+
+impl message {
+    fn shutdown_msg() -> message {
+        message {
+            ops: FS_SHUTDOWN,
+        }
+    }
+
+    fn open_msg() -> message {
+        message {
+            ops: FS_OPEN,
+        }
+    }
+}
+
+
 /// Handle the request from application
 fn handle_client(stream: UnixStream) -> FS_OPS {
     let stream = BufReader::new(stream);
     for line in stream.lines() {
-        match line.unwrap().as_str() {
+        let content = line.unwrap().as_str();
+        match content {
             FS_SHUTDOWN => return FS_OPS::SHUTDOWN,
+            FS_OPEN => {
+                println!("{}", content);
+            }
             _ => FS_OPS::UNSUPPORTED
         };
     }
@@ -150,13 +173,13 @@ impl FS {
     /// Open()
     pub fn open() -> usize {
         let mut stream = UnixStream::connect(DEFAULT_SERVER1_SOCKET_PATH).unwrap();
-        stream.write_all(b"hello world").unwrap();
+        stream.write_all(FS_OPEN.as_bytes()).unwrap();
+        stream.wrtie_all(b"hello world").unwrap();
         0
     }
 
     /// Shutdown FS
     pub fn shutdown() {
-        println!("enter here");
         let mut stream = UnixStream::connect(DEFAULT_SERVER2_SOCKET_PATH).unwrap();
         stream.write_all(FS_SHUTDOWN.as_bytes()).unwrap();
         stream = UnixStream::connect(DEFAULT_SERVER1_SOCKET_PATH).unwrap();
