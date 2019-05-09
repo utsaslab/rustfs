@@ -1,7 +1,6 @@
 #![feature(uniform_paths)]
 #![feature(async_await, await_macro, futures_api)]
 
-#[macro_use]
 extern crate arrayref;
 extern crate spdk_rs;
 extern crate time;
@@ -15,298 +14,296 @@ mod directory;
 mod file;
 mod inode;
 
-use bitmap::FS;
+pub use bitmap::FS;
 use constants::{FILE_TYPE, O_CREAT};
 use directory::DirectoryHandle;
 use file::File::{DataFile, Directory, EmptyFile};
 use file::{File, FileHandle};
-use std::cell::RefCell;
 use std::collections::HashMap;
-use std::rc::Rc;
 
 pub use file::Whence;
 pub use inode::Inode;
 
 pub type FileDescriptor = isize;
-pub static mut fs: FS = FS::new();
+// pub static mut fs: FS = FS::new();
 
-pub struct Proc<'r> {
-    fs: FS,
-    cwd: File<'r>,
-    fd_table: HashMap<FileDescriptor, FileHandle<'r>>,
-    fds: Vec<FileDescriptor>,
-}
+// pub struct Proc<'r> {
+//     fs: FS,
+//     cwd: File<'r>,
+//     fd_table: HashMap<FileDescriptor, FileHandle<'r>>,
+//     fds: Vec<FileDescriptor>,
+// }
 
-impl<'r> Proc<'r> {
-    pub fn new(file_system: &mut FS) -> Proc<'r> {
-        Proc {
-            file_system,
-            cwd: FS::root(),
-            fd_table: HashMap::new(),
-            fds: (0..(256 - 2)).map(|i| 256 - i).collect(),
-        }
-    }
+// impl<'r> Proc<'r> {
+//     pub fn new(file_system: &mut FS) -> Proc<'r> {
+//         Proc {
+//             file_system,
+//             cwd: FS::root(),
+//             fd_table: HashMap::new(),
+//             fds: (0..(256 - 2)).map(|i| 256 - i).collect(),
+//         }
+//     }
 
-    #[inline(always)]
-    fn extract_fd(fd_opt: &Option<FileDescriptor>) -> FileDescriptor {
-        match fd_opt {
-            &Some(fd) => fd,
-            &None => panic!("Error in FD allocation."),
-        }
-    }
+//     #[inline(always)]
+//     fn extract_fd(fd_opt: &Option<FileDescriptor>) -> FileDescriptor {
+//         match fd_opt {
+//             &Some(fd) => fd,
+//             &None => panic!("Error in FD allocation."),
+//         }
+//     }
 
-    pub fn open(&mut self, path: &'r str, flags: u32) -> FileDescriptor {
-        let lookup = self.cwd.get(path);
-        let file = match lookup {
-            Some(f) => f,
-            None => {
-                if (flags & O_CREAT) != 0 {
-                    let inum = &self.fs.inode_bitmap.find()?;
-                    let inode = Inode::new(&self.fs, FILE_TYPE, inum);
-                    let file = File::new_data_file(inode);
-                    // TODO: write to disk here
-                    self.cwd.insert(path, file.clone());
-                    inode.write_inode();
-                    match self.cwd {
-                        Directory(dc) => dc.inode.write_inode(),
-                        _ => {}
-                    }
-                    file
-                } else {
-                    EmptyFile
-                }
-            }
-        };
+//     pub fn open(&mut self, path: &'r str, flags: u32) -> FileDescriptor {
+//         let lookup = self.cwd.get(path);
+//         let file = match lookup {
+//             Some(f) => f,
+//             None => {
+//                 if (flags & O_CREAT) != 0 {
+//                     let inum = &self.fs.inode_bitmap.find()?;
+//                     let inode = Inode::new(&self.fs, FILE_TYPE, inum);
+//                     let file = File::new_data_file(inode);
+//                     // TODO: write to disk here
+//                     self.cwd.insert(path, file.clone());
+//                     inode.write_inode();
+//                     match self.cwd {
+//                         Directory(dc) => dc.inode.write_inode(),
+//                         _ => {}
+//                     }
+//                     file
+//                 } else {
+//                     EmptyFile
+//                 }
+//             }
+//         };
 
-        match file {
-            DataFile(_) => {
-                let fd = Proc::extract_fd(&self.fds.pop());
-                let handle = FileHandle::new(file);
-                self.fd_table.insert(fd, handle);
-                fd
-            }
-            Directory(_) => -1,
-            EmptyFile => -2,
-        }
-    }
+//         match file {
+//             DataFile(_) => {
+//                 let fd = Proc::extract_fd(&self.fds.pop());
+//                 let handle = FileHandle::new(file);
+//                 self.fd_table.insert(fd, handle);
+//                 fd
+//             }
+//             Directory(_) => -1,
+//             EmptyFile => -2,
+//         }
+//     }
 
-    pub fn read(&self, fd: FileDescriptor, dst: &mut [u8]) -> usize {
-        let handle = self.fd_table.get(&fd).expect("fd does not exist");
-        handle.read(dst)
-    }
+//     pub fn read(&self, fd: FileDescriptor, dst: &mut [u8]) -> usize {
+//         let handle = self.fd_table.get(&fd).expect("fd does not exist");
+//         handle.read(dst)
+//     }
 
-    pub fn write(&mut self, fd: FileDescriptor, src: &[u8]) -> usize {
-        let handle = self.fd_table.get_mut(&fd).expect("fd does not exist");
-        handle.write(src)
-    }
+//     pub fn write(&mut self, fd: FileDescriptor, src: &[u8]) -> usize {
+//         let handle = self.fd_table.get_mut(&fd).expect("fd does not exist");
+//         handle.write(src)
+//     }
 
-    pub fn seek(&mut self, fd: FileDescriptor, o: isize, whence: Whence) -> usize {
-        let handle = self.fd_table.get_mut(&fd).expect("fd does not exist");
-        handle.seek(o, whence)
-    }
+//     pub fn seek(&mut self, fd: FileDescriptor, o: isize, whence: Whence) -> usize {
+//         let handle = self.fd_table.get_mut(&fd).expect("fd does not exist");
+//         handle.seek(o, whence)
+//     }
 
-    pub fn close(&mut self, fd: FileDescriptor) {
-        self.fd_table.remove(&fd);
-        self.fds.push(fd);
-    }
+//     pub fn close(&mut self, fd: FileDescriptor) {
+//         self.fd_table.remove(&fd);
+//         self.fds.push(fd);
+//     }
 
-    pub fn unlink(&mut self, path: &'r str) {
-        self.cwd.remove(path);
-    }
-}
+//     pub fn unlink(&mut self, path: &'r str) {
+//         self.cwd.remove(path);
+//     }
+// }
 
-#[cfg(test)]
-mod proc_tests {
-    // extern crate test;
-    extern crate rand;
+// #[cfg(test)]
+// mod proc_tests {
+//     // extern crate test;
+//     extern crate rand;
 
-    use self::rand::random;
-    use super::{Proc, O_CREAT, O_RDWR};
-    use file::Whence::SeekSet;
-    use inode::Inode;
+//     use self::rand::random;
+//     use super::{Proc, O_CREAT, O_RDWR};
+//     use file::Whence::SeekSet;
+//     use inode::Inode;
 
-    static mut test_inode_drop: bool = false;
+//     static mut test_inode_drop: bool = false;
 
-    impl Drop for Inode {
-        fn drop(&mut self) {
-            unsafe {
-                if test_inode_drop {
-                    test_inode_drop = false;
-                    panic!("Dropping.");
-                } else {
-                    println!("Dropping, but no flag.");
-                }
-            }
-        }
-    }
+//     impl Drop for Inode {
+//         fn drop(&mut self) {
+//             unsafe {
+//                 if test_inode_drop {
+//                     test_inode_drop = false;
+//                     panic!("Dropping.");
+//                 } else {
+//                     println!("Dropping, but no flag.");
+//                 }
+//             }
+//         }
+//     }
 
-    fn rand_array(size: usize) -> Vec<u8> {
-        (0..size).map(|_| random::<u8>()).collect()
-    }
+//     fn rand_array(size: usize) -> Vec<u8> {
+//         (0..size).map(|_| random::<u8>()).collect()
+//     }
 
-    fn assert_eq_buf(first: &[u8], second: &[u8]) {
-        assert_eq!(first.len(), second.len());
+//     fn assert_eq_buf(first: &[u8], second: &[u8]) {
+//         assert_eq!(first.len(), second.len());
 
-        for i in 0..first.len() {
-            assert_eq!(first[i], second[i]);
-        }
-    }
+//         for i in 0..first.len() {
+//             assert_eq!(first[i], second[i]);
+//         }
+//     }
 
-    #[test]
-    fn simple_test() {
-        const SIZE: usize = 4096 * 8 + 3434;
-        let mut p = Proc::new();
-        let data = rand_array(SIZE);
-        let mut buf = [0u8; SIZE];
-        let filename = "first_file";
+//     #[test]
+//     fn simple_test() {
+//         const SIZE: usize = 4096 * 8 + 3434;
+//         let mut p = Proc::new();
+//         let data = rand_array(SIZE);
+//         let mut buf = [0u8; SIZE];
+//         let filename = "first_file";
 
-        let fd = p.open(filename, O_RDWR | O_CREAT);
-        p.write(fd, &data);
-        p.seek(fd, 0, SeekSet);
-        p.read(fd, &mut buf);
+//         let fd = p.open(filename, O_RDWR | O_CREAT);
+//         p.write(fd, &data);
+//         p.seek(fd, 0, SeekSet);
+//         p.read(fd, &mut buf);
 
-        assert_eq_buf(&data, &buf);
+//         assert_eq_buf(&data, &buf);
 
-        let fd2 = p.open(filename, O_RDWR);
-        let mut buf2 = [0u8; SIZE];
-        p.read(fd2, &mut buf2);
+//         let fd2 = p.open(filename, O_RDWR);
+//         let mut buf2 = [0u8; SIZE];
+//         p.read(fd2, &mut buf2);
 
-        assert_eq_buf(&data, &buf2);
+//         assert_eq_buf(&data, &buf2);
 
-        p.close(fd);
-        p.close(fd2);
+//         p.close(fd);
+//         p.close(fd2);
 
-        let fd3 = p.open(filename, O_RDWR);
-        let mut buf3 = [0u8; SIZE];
-        p.read(fd3, &mut buf3);
+//         let fd3 = p.open(filename, O_RDWR);
+//         let mut buf3 = [0u8; SIZE];
+//         p.read(fd3, &mut buf3);
 
-        assert_eq_buf(&data, &buf3);
-        p.close(fd3);
+//         assert_eq_buf(&data, &buf3);
+//         p.close(fd3);
 
-        p.unlink(filename);
+//         p.unlink(filename);
 
-        let fd4 = p.open(filename, O_RDWR);
-        assert_eq!(fd4, -2);
-    }
+//         let fd4 = p.open(filename, O_RDWR);
+//         assert_eq!(fd4, -2);
+//     }
 
-    #[test]
-    #[should_panic]
-    fn test_proc_drop_inode_dealloc() {
-        // Variable is used to make sure that the Drop implemented is only valid for
-        // tests that set that test_inode_drop global variable to true.
-        unsafe {
-            test_inode_drop = true;
-        }
+//     #[test]
+//     #[should_panic]
+//     fn test_proc_drop_inode_dealloc() {
+//         // Variable is used to make sure that the Drop implemented is only valid for
+//         // tests that set that test_inode_drop global variable to true.
+//         unsafe {
+//             test_inode_drop = true;
+//         }
 
-        const SIZE: usize = 4096 * 3 + 3498;
-        let mut p = Proc::new();
-        let mut data = rand_array(SIZE);
+//         const SIZE: usize = 4096 * 3 + 3498;
+//         let mut p = Proc::new();
+//         let mut data = rand_array(SIZE);
 
-        let fd = p.open("file", O_RDWR | O_CREAT);
-        p.write(fd, &mut data);
-    }
+//         let fd = p.open("file", O_RDWR | O_CREAT);
+//         p.write(fd, &mut data);
+//     }
 
-    /**
-     * This function makes sure that on unlink, the inode's data structure is
-     * indeed dropped. This means that a few things have gone right:
-     *
-     * 1) The FileHandle was dropped. If it wasn't, it would hold a reference to
-     *    the file and so the file wouldn't be dropped. This should happen on
-     *    close.
-     * 2) The File, containing the Inode, was dropped. This should happen on
-     *    unlink.
-     */
-    #[test]
-    #[should_panic]
-    fn test_inode_dealloc() {
-        // Make sure flag is set to detect drop.
-        unsafe {
-            test_inode_drop = true;
-        }
+//     /**
+//      * This function makes sure that on unlink, the inode's data structure is
+//      * indeed dropped. This means that a few things have gone right:
+//      *
+//      * 1) The FileHandle was dropped. If it wasn't, it would hold a reference to
+//      *    the file and so the file wouldn't be dropped. This should happen on
+//      *    close.
+//      * 2) The File, containing the Inode, was dropped. This should happen on
+//      *    unlink.
+//      */
+//     #[test]
+//     #[should_panic]
+//     fn test_inode_dealloc() {
+//         // Make sure flag is set to detect drop.
+//         unsafe {
+//             test_inode_drop = true;
+//         }
 
-        const SIZE: usize = 4096 * 3 + 3498;
-        let mut p = Proc::new();
-        let mut data = rand_array(SIZE);
-        let mut buf = [0u8; SIZE];
-        let filename = "first_file";
+//         const SIZE: usize = 4096 * 3 + 3498;
+//         let mut p = Proc::new();
+//         let mut data = rand_array(SIZE);
+//         let mut buf = [0u8; SIZE];
+//         let filename = "first_file";
 
-        let fd = p.open(filename, O_RDWR | O_CREAT);
-        p.write(fd, &mut data);
-        p.seek(fd, 0, SeekSet);
-        p.read(fd, &mut buf);
+//         let fd = p.open(filename, O_RDWR | O_CREAT);
+//         p.write(fd, &mut data);
+//         p.seek(fd, 0, SeekSet);
+//         p.read(fd, &mut buf);
 
-        assert_eq_buf(&data, &buf);
+//         assert_eq_buf(&data, &buf);
 
-        // close + unlink should remove both references to inode, dropping it,
-        // causing a failure
-        p.close(fd);
-        p.unlink(filename);
+//         // close + unlink should remove both references to inode, dropping it,
+//         // causing a failure
+//         p.close(fd);
+//         p.unlink(filename);
 
-        // If inode is not being dropped properly, ie, on the unlink call this will
-        // cause a double failure: once for panic! call, and once when then the Inode
-        // is dropped since the Proc structure will be dropped.
-        //
-        // To test that RC is working properly, make sure that a double failure
-        // occurs when either the close or unlink calls above are commented out.
-        panic!("Inode not dropped!");
-    }
+//         // If inode is not being dropped properly, ie, on the unlink call this will
+//         // cause a double failure: once for panic! call, and once when then the Inode
+//         // is dropped since the Proc structure will be dropped.
+//         //
+//         // To test that RC is working properly, make sure that a double failure
+//         // occurs when either the close or unlink calls above are commented out.
+//         panic!("Inode not dropped!");
+//     }
 
-    #[test]
-    fn test_max_singly_file_size() {
-        const SIZE: usize = 4096 * 256;
-        let mut p = Proc::new();
-        let mut data = rand_array(SIZE);
-        let mut buf = [0u8; SIZE];
-        let filename = "first_file";
+//     #[test]
+//     fn test_max_singly_file_size() {
+//         const SIZE: usize = 4096 * 256;
+//         let mut p = Proc::new();
+//         let mut data = rand_array(SIZE);
+//         let mut buf = [0u8; SIZE];
+//         let filename = "first_file";
 
-        let fd = p.open(filename, O_RDWR | O_CREAT);
-        p.write(fd, &mut data);
-        p.seek(fd, 0, SeekSet);
-        p.read(fd, &mut buf);
+//         let fd = p.open(filename, O_RDWR | O_CREAT);
+//         p.write(fd, &mut data);
+//         p.seek(fd, 0, SeekSet);
+//         p.read(fd, &mut buf);
 
-        assert_eq_buf(&data, &buf);
+//         assert_eq_buf(&data, &buf);
 
-        p.close(fd);
-        p.unlink(filename);
+//         p.close(fd);
+//         p.unlink(filename);
 
-        let fd4 = p.open(filename, O_RDWR);
-        assert_eq!(fd4, -2);
-    }
+//         let fd4 = p.open(filename, O_RDWR);
+//         assert_eq!(fd4, -2);
+//     }
 
-    #[test]
-    fn test_max_file_size() {
-        const SIZE: usize = 2 * 4096 * 256;
-        let mut p = Proc::new();
-        let mut data1 = rand_array(SIZE);
-        let mut data2 = rand_array(SIZE);
-        let mut buf = vec![0; SIZE];
-        let filename = "first_file";
+//     #[test]
+//     fn test_max_file_size() {
+//         const SIZE: usize = 2 * 4096 * 256;
+//         let mut p = Proc::new();
+//         let mut data1 = rand_array(SIZE);
+//         let mut data2 = rand_array(SIZE);
+//         let mut buf = vec![0; SIZE];
+//         let filename = "first_file";
 
-        let fd = p.open(filename, O_RDWR | O_CREAT);
-        p.write(fd, &mut data1);
-        p.seek(fd, 4096 * 257 * 256 - SIZE as isize, SeekSet);
-        p.write(fd, &mut data2);
+//         let fd = p.open(filename, O_RDWR | O_CREAT);
+//         p.write(fd, &mut data1);
+//         p.seek(fd, 4096 * 257 * 256 - SIZE as isize, SeekSet);
+//         p.write(fd, &mut data2);
 
-        p.seek(fd, 0, SeekSet);
-        p.read(fd, &mut buf);
-        assert_eq_buf(&data1, &buf);
+//         p.seek(fd, 0, SeekSet);
+//         p.read(fd, &mut buf);
+//         assert_eq_buf(&data1, &buf);
 
-        p.seek(fd, 4096 * 257 * 256 - SIZE as isize, SeekSet);
-        p.read(fd, &mut buf);
-        assert_eq_buf(&data2, &buf);
-    }
+//         p.seek(fd, 4096 * 257 * 256 - SIZE as isize, SeekSet);
+//         p.read(fd, &mut buf);
+//         assert_eq_buf(&data2, &buf);
+//     }
 
-    #[test]
-    #[should_panic]
-    fn test_morethan_max_file_size() {
-        const SIZE: usize = 2 * 4096 * 256;
-        let mut p = Proc::new();
-        let mut data = rand_array(SIZE);
-        let filename = "first_file";
+//     #[test]
+//     #[should_panic]
+//     fn test_morethan_max_file_size() {
+//         const SIZE: usize = 2 * 4096 * 256;
+//         let mut p = Proc::new();
+//         let mut data = rand_array(SIZE);
+//         let filename = "first_file";
 
-        let fd = p.open(filename, O_RDWR | O_CREAT);
-        p.write(fd, &mut data);
-        p.seek(fd, 4096 * 257 * 256 + 1 - SIZE as isize, SeekSet);
-        p.write(fd, &mut data);
-    }
-}
+//         let fd = p.open(filename, O_RDWR | O_CREAT);
+//         p.write(fd, &mut data);
+//         p.seek(fd, 4096 * 257 * 256 + 1 - SIZE as isize, SeekSet);
+//         p.write(fd, &mut data);
+//     }
+// }

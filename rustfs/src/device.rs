@@ -16,13 +16,6 @@ pub struct Device {
 
 impl Device {
     pub fn new() -> Device {
-        let mut first_bdev = bdev::first();
-        while !first_bdev.is_none() {
-            let bdev = first_bdev.unwrap();
-            println!("bdev name: {}", bdev.name());
-            first_bdev = bdev::next(&bdev);
-        }
-
         let ret = bdev::get_by_name("Malloc0");
         let bdev = ret.unwrap();
         let mut desc = SpdkBdevDesc::new();
@@ -31,19 +24,34 @@ impl Device {
             Ok(_) => println!("Successfully open the device"),
             _ => {}
         }
+        let io_channel = bdev::get_io_channel(desc.clone()).unwrap();
+        let blk_size = spdk_rs::bdev::get_block_size(bdev.clone());
+        let buf_align = spdk_rs::bdev::get_buf_align(bdev.clone());
+        Device {
+            desc,
+            io_channel,
+            buf_align,
+            blk_size,
+        }
     }
     // nbytes = blk_size?
-    fn read(&self, read_buf: &mut env::Buf, offset: u64, nbytes: u64) -> Result<usize, Error> {
-        await!(bdev::read(
+    pub fn read(&self, read_buf: &mut env::Buf, offset: u64, nbytes: u64) -> Result<usize, Error> {
+        match await!(bdev::read(
             self.desc.clone(),
             &self.io_channel,
             &mut read_buf,
             offset,
             nbytes
-        ))
+        )) {
+            Ok(_) => {
+                let read_buf_string = read_buf.read().to_string();
+                Ok(read_buf_string.len())
+            }
+            Err(error) => panic!("{:}", error),
+        }
     }
 
-    fn write(&self, write_buf: &env::Buf, offset: u64, nbytes: u64) -> Result<usize, Error> {
+    pub fn write(&self, write_buf: &env::Buf, offset: u64, nbytes: u64) -> Result<usize, Error> {
         await!(bdev::write(
             self.desc.clone(),
             &self.io_channel,
@@ -53,8 +61,12 @@ impl Device {
         ))
     }
 
-    fn blk_size(&self) -> u32 {
-        self.blk_size
+    pub fn blk_size(&self) -> usize {
+        self.blk_size as usize
+    }
+
+    pub fn buf_align(&self) -> usize {
+        self.buf_align
     }
 }
 

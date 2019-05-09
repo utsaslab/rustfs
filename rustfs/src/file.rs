@@ -3,11 +3,9 @@ use self::File::{DataFile, Directory};
 use crate::constants;
 use crate::inode;
 
-use constants::DIR_TYPE;
 use inode::Inode;
-use std::cell::{Cell, RefCell};
+use std::cell::Cell;
 use std::collections::HashMap;
-use std::rc::Rc;
 
 //pub type RcDirContent<'r> = Rc<RefCell<Box<DirectoryContent<'r>>>>;
 //pub type RcInode = Rc<RefCell<Box<Inode>>>;

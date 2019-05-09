@@ -1,0 +1,8 @@
+[package]
+name = "rustfs-examples"
+version = "0.1.0"
+authors = ["xxks-kkk <ferrishu3886@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+rustfs = { path="../../rustfs"}

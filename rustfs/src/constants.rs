@@ -9,3 +9,4 @@ pub const O_RDWR: u32 = (1 << 2);
 pub const O_NONBLOCK: u32 = (1 << 3);
 pub const O_APPEND: u32 = (1 << 4);
 pub const O_CREAT: u32 = (1 << 5);
+pub const DEFAULT_SOCKET_PATH: &str = "/tmp/rustfs.sock";
