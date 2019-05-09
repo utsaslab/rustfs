@@ -12,6 +12,12 @@ use nix::unistd::*;
 
 use crate::constants::{DEFAULT_SERVER1_SOCKET_PATH, DEFAULT_SERVER2_SOCKET_PATH};
 
+#[derive(PartialEq, Debug, Clone, Copy)]
+enum SPDK_OPS {
+    NO_OP,
+    SHUTDOWN
+}
+
 /// Handle the request from application
 fn handle_client(stream: UnixStream) {
     let stream = BufReader::new(stream);
@@ -21,14 +27,14 @@ fn handle_client(stream: UnixStream) {
 }
 
 /// Handle the request from server1
-fn handle_server1(stream: UnixStream) -> i32 {
+fn handle_server1(stream: UnixStream) -> SPDK_OPS {
     let stream = BufReader::new(stream);
     for line in stream.lines() {
         if line.unwrap() == "stop" {
-            return 1992;
+            return SPDK_OPS::SHUTDOWN;
         }
     }
-    0
+    SPDK_OPS::NO_OP
 }
 
 #[allow(unused_variables)]
@@ -46,7 +52,7 @@ async fn start_server2(poller: spdk_rs::io_channel::PollerHandle) {
                 let handle = thread::spawn(|| handle_server1(stream));
                 let res = handle.join().unwrap();
                 dbg!(res);
-                if res == 1992 {
+                if res == SPDK_OPS::SHUTDOWN {
                     break;
                 }
             }
