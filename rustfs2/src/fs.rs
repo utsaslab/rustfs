@@ -12,6 +12,8 @@ use nix::sys::signal::*;
 use nix::unistd::*;
 use std::io::prelude::*;
 
+static mut server1_sock_up: bool = false;
+static mut server2_sock_up: bool = false;
 
 use crate::constants::{DEFAULT_SERVER1_SOCKET_PATH, DEFAULT_SERVER2_SOCKET_PATH};
 
@@ -38,6 +40,27 @@ fn handle_client(stream: UnixStream) -> FS_OPS{
     FS_OPS::NO_OP
 }
 
+fn start_server1() {
+    let listener = UnixListener::bind(DEFAULT_SERVER1_SOCKET_PATH).unwrap();
+    unsafe {server1_sock_up = true;}
+    for stream in listener.incoming() {
+                    match stream {
+                        Ok(stream) => {
+                            let handle = thread::spawn(|| handle_client(stream));
+                            let res = handle.join().unwrap();
+                            dbg!(res);
+                            if res == FS_OPS::SHUTDOWN {
+                                break;
+                            }                            
+                        }
+                        Err(err) => {
+                            println!("Error: {}", err);
+                            break;
+                        }
+                    }
+                }    
+}
+
 /// Handle the request from server1
 fn handle_server1(stream: UnixStream) -> FS_OPS {
     let stream = BufReader::new(stream);
@@ -62,6 +85,7 @@ async fn start_server2(poller: spdk_rs::io_channel::PollerHandle) {
             return;
         }
     };
+    unsafe {server2_sock_up = true;}
     for stream in listener.incoming() {
         match stream {
             Ok(stream) => {
@@ -105,7 +129,8 @@ fn start_spdk<
     println!("Successfully shutdown SPDK framework");
 }
 
-pub struct FS {}
+pub struct FS {
+}
 
 impl FS {
     /// We create a new file system instance
@@ -123,30 +148,16 @@ impl FS {
             fs::remove_file(DEFAULT_SERVER2_SOCKET_PATH)?;
         }
         match fork().expect("fork failed") {
+            // We're in the parent process; we start server1            
             ForkResult::Parent { child } => {
-                // We're in the parent process; we start server1
-                let listener = UnixListener::bind(DEFAULT_SERVER1_SOCKET_PATH).unwrap();
-                for stream in listener.incoming() {
-                    match stream {
-                        Ok(stream) => {
-                            let handle = thread::spawn(|| handle_client(stream));
-                            let res = handle.join().unwrap();
-                            dbg!(res);
-                            if res == FS_OPS::SHUTDOWN {
-                                break;
-                            }                            
-                        }
-                        Err(err) => {
-                            println!("Error: {}", err);
-                            break;
-                        }
-                    }
-                }
+
+
+                        start_server1();
                 Ok(())
             }
             ForkResult::Child => {
                 // We're in the child process; we start server2
-                start_spdk(start_server2);
+                start_spdk(start_server2);                                        
                 Ok(())
             }
         }
