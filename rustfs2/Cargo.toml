@@ -1,0 +1,14 @@
+[package]
+name = "rustfs2"
+version = "0.1.0"
+authors = ["xxks-kkk <ferrishu3886@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+time = "0.1"
+rand = "0.6"
+spdk-rs = { path="../spdk-rs"}
+libc = "0.2"
+arrayref = "0.3.5"
+failure = "0.1.3"
+nix = "0.13.0"
