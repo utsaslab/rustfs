@@ -22,6 +22,7 @@ use crate::constants::{
 
 // A global reference to device struct
 static mut dev: Option<Device> = None;
+static mut fs_internal: Option<FsInternal> = None;
 
 #[derive(PartialEq, Debug, Clone, Copy)]
 enum FsOps {
@@ -105,11 +106,6 @@ async fn start_server2(poller: spdk_rs::io_channel::PollerHandle) {
             return;
         }
     };
-    // We initialize FS both in memory and on disk
-    match await!(FsInternal::mkfs()) {
-        Ok(_) => {}
-        Err(error) => panic!("{:?}", error)
-    };
     for stream in listener.incoming() {
         match stream {
             Ok(stream) => {
@@ -127,8 +123,10 @@ async fn start_server2(poller: spdk_rs::io_channel::PollerHandle) {
                             Err(error) => panic!("{:?}", error),
                         }
                         FS_SHUTDOWN => break,
-                        // User shouldn't really call mkfs() themselves; it is done by new() automatically                        
-                        FS_MKFS => {},                      
+                        FS_MKFS => match await!(FsInternal::mkfs()) {
+                            Ok(_) => {}
+                            Err(error) => panic!("{:?}", error)
+                        },   
                         _ => {}
                     };
                 }
@@ -179,11 +177,17 @@ fn start_spdk<
 
 /// Internal FS state data structure
 pub struct FsInternal {
-    
+    pub device: Device,
+    //    data_bitmap_base: usize,
+    //    inode_bitmap_base: usize,
+    pub inode_base: usize,
+    pub data_base: usize,
+    pub inode_bitmap: Bitmap,
+    pub data_bitmap: Bitmap,
+    //pub root: Option<File<'r>>,    
 }
 
-impl FsInternal {
-    
+impl FsInternal {    
     /// Open()
     async fn open() -> Result<(), Error> {
         unimplemented!();
@@ -196,14 +200,16 @@ impl FsInternal {
         }
         let device = dev.unwrap();
         let blk_size = device.blk_size();
-        // FS {
-        //     device: device,
-        //     inode_base: 3 * blk_size,
-        //     data_base: 3 * blk_size + INODE_SIZE * blk_size * 8,
-        //     inode_bitmap: Bitmap::new(blk_size as u64, blk_size),
-        //     data_bitmap: Bitmap::new(2 * blk_size as u64, blk_size),
-        //     root: None,
-        // };
+        unsafe {
+            fs_internal = Some(FsInternal {
+                device: device,
+                inode_base: 3 * blk_size,
+                data_base: 3 * blk_size + INODE_SIZE * blk_size * 8,
+                inode_bitmap: Bitmap::new(blk_size, blk_size),
+                data_bitmap: Bitmap::new(2 * blk_size, blk_size),
+                //root: None,
+            });
+        }
         // Let's persistent the FS structure onto disk
         let zero_buf = spdk_rs::env::dma_zmalloc(device.blk_size(), device.buf_align());
         let mut write_buf = spdk_rs::env::dma_zmalloc(device.blk_size(), device.buf_align());
