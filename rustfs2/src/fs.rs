@@ -20,9 +20,7 @@ use crate::constants::{
     DEFAULT_SERVER1_SOCKET_PATH, DEFAULT_SERVER2_SOCKET_PATH, FS_MKFS, FS_OPEN, FS_SHUTDOWN,
 };
 
-// A global reference to device struct
-static mut dev: Option<Device> = None;
-static mut fs_internal: Option<FsInternal> = None;
+pub static mut fs_internal: Option<FsInternal> = None;
 
 #[derive(PartialEq, Debug, Clone, Copy)]
 enum FsOps {
@@ -195,10 +193,7 @@ impl FsInternal {
 
     /// mkfs()
     async fn mkfs() -> Result<(), Error> {
-        unsafe {
-            dev = Some(Device::new());
-        }
-        let device = dev.unwrap();
+        let device = Device::new();
         let blk_size = device.blk_size();
         unsafe {
             fs_internal = Some(FsInternal {
@@ -227,6 +222,54 @@ impl FsInternal {
         //self.make_root(root_inode);
         Ok(())
     }
+
+    pub async fn alloc_block() -> usize {
+        let fs = fs_internal.unwrap();
+        let index = fs.data_bitmap.find().unwrap();
+        let offset = index * fs.device.blk_size() + fs.data_base;
+        let zero_buf = spdk_rs::env::dma_zmalloc(fs.device.blk_size(), fs.device.buf_align());
+        await!(fs.device.write(&zero_buf, offset, fs.device.blk_size()));
+        offset / fs.device.blk_size()
+    }
+
+
+    async fn mount() -> Result<(), Error> {
+        let fs = fs_internal.unwrap();
+        let mut read_buf = spdk_rs::env::dma_zmalloc(fs.device.blk_size(), fs.device.buf_align());
+        await!(fs.device.read(
+            &mut read_buf,
+            fs.device.blk_size(),
+            fs.device.blk_size(),
+        ));
+        fs.inode_bitmap
+            .bitmap
+            .copy_from_slice(read_buf.read_bytes(fs.device.blk_size()));
+        await!(fs.device.read(
+            &mut read_buf,
+            2 * fs.device.blk_size(),
+            fs.device.blk_size(),
+        ));
+        fs.data_bitmap
+            .bitmap
+            .copy_from_slice(read_buf.read_bytes(fs.device.blk_size()));
+        await!(fs.device.read(
+            &mut read_buf,
+            3 * fs.device.blk_size(),
+            fs.device.blk_size(),
+        ));
+        // let root_inode: Inode;
+        // root_inode.read_inode();
+        // self.make_root(root_inode);
+        Ok(())
+    }
+
+    // fn make_root(&mut self, root_inode: Inode<'r>) {
+    //     let dir_content = DirectoryContent {
+    //         entries: None,
+    //         inode: root_inode,
+    //     };
+    //     self.root = Some(Directory(dir_content));
+    // }
 }
 
 /// Public API for the user

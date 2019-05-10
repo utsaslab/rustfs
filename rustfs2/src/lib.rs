@@ -22,6 +22,6 @@ mod constants;
 mod device;
 mod file;
 mod fs;
-mode inode;
+mod inode;
 
 pub use fs::FS;

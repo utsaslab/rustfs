@@ -1,7 +1,5 @@
-use crate::bitmap;
-
 use crate::constants::{BLOCK_SIZE, INODE_SIZE, LIST_SIZE};
-use bitmap::FS;
+use crate::fs::{fs_internal, FsInternal};
 use std::mem;
 use std::ptr;
 use std::ptr::copy_nonoverlapping;
@@ -31,20 +29,17 @@ pub fn create_tlist<T>() -> TList<T> {
 }
 
 #[derive(Clone)]
-pub struct Inode<'r> {
-    pub fs: &'r mut FS<'r>,
+pub struct Inode {
     pub inum: usize,
-
     pub dirtype: usize,
     single: Option<usize>,
     double: Option<usize>,
     size: usize,
 }
 
-impl<'r> Inode<'r> {
-    pub fn new(fs: &'r mut FS<'r>, dirtype: usize, inum: usize) -> Inode<'r> {
+impl Inode {
+    pub fn new(dirtype: usize, inum: usize) -> Inode {
         Inode {
-            fs: fs,
             inum: inum,
             dirtype: dirtype,
             single: None,
@@ -53,12 +48,13 @@ impl<'r> Inode<'r> {
         }
     }
 
-    pub fn read_inode(&self) {
-        let offset = self.fs.inode_base + self.inum * INODE_SIZE;
+    async fn read_inode(&self) {
+        let fs = fs_internal.unwrap();
+        let offset = fs.inode_base + self.inum * INODE_SIZE;
         let blk = offset / BLOCK_SIZE;
         let blk_offset = offset % BLOCK_SIZE;
         let mut read_buf = spdk_rs::env::dma_zmalloc(BLOCK_SIZE, 0);
-        self.fs.device.read(&mut read_buf, blk, BLOCK_SIZE);
+        await!(fs.device.read(&mut read_buf, blk, BLOCK_SIZE));
         let mut buf = read_buf.read_bytes(BLOCK_SIZE);
         let mut content = &buf[blk_offset..blk_offset + INODE_SIZE];
         unsafe {
@@ -83,13 +79,14 @@ impl<'r> Inode<'r> {
         entry
     }
 
-    pub fn write_inode(&self) {
+    async fn write_inode(&self) {
         // TODO: add unit test
-        let offset = self.fs.inode_base + self.inum * INODE_SIZE;
+        let fs = fs_internal.unwrap();
+        let offset = fs.inode_base + self.inum * INODE_SIZE;
         let blk = offset / BLOCK_SIZE;
         let blk_offset = offset % BLOCK_SIZE;
         let mut read_buf = spdk_rs::env::dma_zmalloc(BLOCK_SIZE, 0);
-        self.fs.device.read(&mut read_buf, blk, BLOCK_SIZE);
+        await!(fs.device.read(&mut read_buf, blk, BLOCK_SIZE));
         let mut buf = read_buf.read_bytes(BLOCK_SIZE);
         let mut content = &buf[blk_offset..blk_offset + INODE_SIZE];
         unsafe {
@@ -104,23 +101,24 @@ impl<'r> Inode<'r> {
         }
         let mut write_buf = read_buf;
         write_buf.fill_bytes(buf);
-        self.fs.device.write(&write_buf, blk, BLOCK_SIZE);
+        await!(fs.device.write(&write_buf, blk, BLOCK_SIZE));
     }
 
-    // read inode metadata and return block number
-    pub fn get_or_alloc_page<'a>(&'a mut self, num: usize) -> usize {
+    /// read inode metadata and return block number
+    async fn get_or_alloc_page(&mut self, num: usize) -> usize {
+        let fs = fs_internal.unwrap();
         if num >= LIST_SIZE + 1 {
             panic!("Maximum file size exceeded!")
         };
 
         let mut need_update: bool = false;
-        &mut self.read_inode();
+        await!(self.read_inode());
 
         // Getting a pointer to the page
         let page = if num == 0 {
             if self.single.is_none() {
                 //                if self.size == 0 {
-                self.single = Some(self.fs.alloc_block());
+                self.single = Some(await!(FsInternal::alloc_block()));
                 need_update = true;
                 //                }else{
                 //                    &mut self.read_inode();
@@ -133,16 +131,15 @@ impl<'r> Inode<'r> {
             let index = num - 1;
             if self.double.is_none() {
                 //                if self.size <= BLOCK_SIZE {
-                self.double = Some(self.fs.alloc_block());
+                self.double = Some(await!(FsInternal::alloc_block()));
                 need_update = true;
                 //                }else{
                 //                }
             }
             let mut read_buf = spdk_rs::env::dma_zmalloc(BLOCK_SIZE, 0);
-            let offset = self.fs.data_base + self.double.unwrap() * BLOCK_SIZE;
-            self.fs.device.read(&mut read_buf, offset, BLOCK_SIZE);
+            let offset = fs.data_base + self.double.unwrap() * BLOCK_SIZE;
+            await!(fs.device.read(&mut read_buf, offset, BLOCK_SIZE));
             let entry = Inode::parse_entry(read_buf.read_bytes(BLOCK_SIZE), index);
-
             entry
         };
 
@@ -152,29 +149,28 @@ impl<'r> Inode<'r> {
         page
     }
 
-    fn get_page<'a>(&'a self, num: usize) -> usize {
+    async fn get_page(&self, num: usize) -> usize {
+        let fs = fs_internal.unwrap();
         if num * BLOCK_SIZE >= self.size {
             panic!("Page does not exist.")
         };
-        &mut self.read_inode();
-
+        await!(self.read_inode());
         if num == 0 {
             0
         } else {
             let index = num - 1;
-
             let mut read_buf = spdk_rs::env::dma_zmalloc(BLOCK_SIZE, 0);
-            let offset = self.fs.data_base + self.double.unwrap() * BLOCK_SIZE;
-            &mut self.fs.device.read(&mut read_buf, offset, BLOCK_SIZE);
+            let offset = fs.data_base + self.double.unwrap() * BLOCK_SIZE;
+            await!(fs.device.read(&mut read_buf, offset, BLOCK_SIZE));
             let entry = Inode::parse_entry(read_buf.read_bytes(BLOCK_SIZE), index);
             entry
-
             // TODO: read the indirect block
         }
     }
 
-    pub fn write(&mut self, offset: usize, data: &[u8]) -> usize {
-        let mut written = 0;
+    async fn write<'a>(&'a mut self, offset: usize, data: &'a [u8]) -> usize {
+        let fs = fs_internal.unwrap();
+        let mut written: usize = 0;
         let mut block_offset = offset % BLOCK_SIZE; // offset from first block
 
         let start = offset / BLOCK_SIZE; // first block to act on
@@ -195,12 +191,12 @@ impl<'r> Inode<'r> {
             };
 
             // Finding our block, writing to it
-            let page = self.get_or_alloc_page(start + i);
+            let page = await!(self.get_or_alloc_page(start + i));
 
             // TODO: check this!
-            let pg_offset = self.fs.data_base + page * BLOCK_SIZE;
+            let pg_offset = fs.data_base + page * BLOCK_SIZE;
             let mut read_buf = spdk_rs::env::dma_zmalloc(BLOCK_SIZE, 0);
-            self.fs.device.read(&mut read_buf, pg_offset, BLOCK_SIZE);
+            await!(fs.device.read(&mut read_buf, pg_offset, BLOCK_SIZE));
             let disk_page = read_buf.read_bytes(BLOCK_SIZE);
             // let slice = array_mut_ref![disk_page, block_offset, num_bytes];
             let mut slice = &mut disk_page[block_offset..(block_offset + num_bytes)];
@@ -212,20 +208,16 @@ impl<'r> Inode<'r> {
             }
             let mut write_buf = spdk_rs::env::dma_zmalloc(BLOCK_SIZE, 0);
             write_buf.fill_bytes(disk_page);
-            self.fs.device.write(&mut write_buf, offset, BLOCK_SIZE);
-
+            await!(fs.device.write(&mut write_buf, offset, BLOCK_SIZE));
             written += num_bytes;
         }
-
         let last_byte = offset + written;
         if self.size < last_byte {
             self.size = last_byte;
         }
-
         //        let time_now = time::get_time();
         //        self.mod_time = time_now;
         //        self.access_time = time_now;
-
         written
     }
 
@@ -273,257 +265,5 @@ impl<'r> Inode<'r> {
 
     pub fn size(&self) -> usize {
         self.size
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::mem;
-
-    extern crate libc;
-
-    use inode::spdk_rs::raw;
-    use std::ffi::{CStr, CString};
-    use std::os::raw::{c_char, c_int, c_void};
-    use std::ptr;
-
-    #[derive(Debug)]
-    struct hello_context_t {
-        bdev: *mut raw::spdk_bdev,
-        bdev_desc: *mut raw::spdk_bdev_desc,
-        bdev_io_channel: *mut raw::spdk_io_channel,
-        buff: *mut c_char,
-        bdev_name: *const c_char,
-    }
-
-    extern "C" fn read_complete(
-        bdev_io: *mut raw::spdk_bdev_io,
-        success: bool,
-        cb_arg: *mut c_void,
-    ) {
-        let hello_context: *mut hello_context_t = cb_arg as *mut hello_context_t;
-
-        unsafe {
-            match success {
-                true => {
-                    let slice = CStr::from_ptr((*hello_context).buff);
-                    println!(
-                        "string buffer size without nul terminator: {}",
-                        slice.to_bytes().len()
-                    );
-                    println!(
-                        "Read string from bdev: {}",
-                        CStr::from_ptr((*hello_context).buff).to_str().unwrap()
-                    );
-                }
-                false => {
-                    println!("bdev io read error");
-                }
-            }
-
-            raw::spdk_bdev_free_io(bdev_io);
-            raw::spdk_put_io_channel((*hello_context).bdev_io_channel);
-            raw::spdk_bdev_close((*hello_context).bdev_desc);
-            println!("Stopping app");
-            raw::spdk_app_stop(if success { 0 } else { -1 });
-        }
-    }
-
-    extern "C" fn write_complete(
-        bdev_io: *mut raw::spdk_bdev_io,
-        success: bool,
-        cb_arg: *mut c_void,
-    ) {
-        let hello_context: *mut hello_context_t = cb_arg as *mut hello_context_t;
-        let rc: c_int;
-        let blk_size: u32;
-
-        unsafe {
-            raw::spdk_bdev_free_io(bdev_io);
-
-            match success {
-                true => {
-                    println!("bdev io write completed successfully");
-                }
-                false => {
-                    println!("bdev io write error: {}", raw::EIO);
-                    raw::spdk_put_io_channel((*hello_context).bdev_io_channel);
-                    raw::spdk_bdev_close((*hello_context).bdev_desc);
-                    raw::spdk_app_stop(-1);
-                    return;
-                }
-            }
-
-            blk_size = raw::spdk_bdev_get_block_size((*hello_context).bdev);
-            raw::memset((*hello_context).buff as *mut c_void, 0, blk_size as usize);
-
-            println!("Reading io");
-            let hello_context_ptr: *mut c_void = hello_context as *mut _ as *mut c_void;
-            rc = raw::spdk_bdev_read(
-                (*hello_context).bdev_desc,
-                (*hello_context).bdev_io_channel,
-                (*hello_context).buff as *mut c_void,
-                0,
-                blk_size as u64,
-                Some(read_complete),
-                hello_context_ptr,
-            );
-            if rc != 0 {
-                println!(
-                    "{} error while reading from bdev: {}",
-                    CStr::from_ptr(raw::spdk_strerror(-rc)).to_str().unwrap(),
-                    rc
-                );
-                raw::spdk_put_io_channel((*hello_context).bdev_io_channel);
-                raw::spdk_bdev_close((*hello_context).bdev_desc);
-                raw::spdk_app_stop(-1);
-                return;
-            }
-        }
-    }
-
-    extern "C" fn hello_start(_arg1: *mut c_void, _arg2: *mut c_void) {
-        let hello_context: *mut hello_context_t = _arg1 as *mut hello_context_t;
-        let blk_size: u32;
-        let buf_align: usize;
-        let mut rc: c_int;
-        unsafe {
-            (*hello_context).bdev = ptr::null_mut();
-        }
-        unsafe {
-            (*hello_context).bdev_desc = ptr::null_mut();
-        }
-
-        println!("Successfully started the application");
-
-        unsafe {
-            println!("Try to get a list of bdev ... ");
-            let mut first: *mut raw::spdk_bdev = raw::spdk_bdev_first();
-            while !first.is_null() {
-                let owned_fmt = CString::new("bdev name: %s\n").unwrap();
-                let fmt: *const c_char = owned_fmt.as_ptr();
-                libc::printf(fmt, (*first).name);
-                first = raw::spdk_bdev_next(first);
-            }
-
-            (*hello_context).bdev = raw::spdk_bdev_get_by_name((*hello_context).bdev_name);
-            if (*hello_context).bdev.is_null() {
-                println!(
-                    "Could not find the bdev {}",
-                    CStr::from_ptr((*hello_context).bdev_name).to_str().unwrap()
-                );
-                raw::spdk_app_stop(-1);
-                return;
-            }
-
-            println!(
-                "Opening the bdev {}",
-                CStr::from_ptr((*hello_context).bdev_name).to_str().unwrap()
-            );
-            rc = raw::spdk_bdev_open(
-                (*hello_context).bdev,
-                true,
-                None,
-                ptr::null_mut(),
-                &mut (*hello_context).bdev_desc,
-            );
-            if rc != 0 {
-                println!(
-                    "Could not open bdev: {}",
-                    CStr::from_ptr((*hello_context).bdev_name).to_str().unwrap()
-                );
-                raw::spdk_app_stop(-1);
-                return;
-            }
-
-            println!("Opening io channel");
-            (*hello_context).bdev_io_channel =
-                raw::spdk_bdev_get_io_channel((*hello_context).bdev_desc);
-            if (*hello_context).bdev_io_channel.is_null() {
-                println!("Could not create bdev I/O channel!!");
-                raw::spdk_bdev_close((*hello_context).bdev_desc);
-                raw::spdk_app_stop(-1);
-                return;
-            }
-
-            blk_size = raw::spdk_bdev_get_block_size((*hello_context).bdev);
-            buf_align = raw::spdk_bdev_get_buf_align((*hello_context).bdev);
-            (*hello_context).buff =
-                raw::spdk_dma_zmalloc(blk_size as usize, buf_align, ptr::null_mut()) as *mut c_char;
-            if (*hello_context).buff.is_null() {
-                println!("Failed to allocate buffer");
-                raw::spdk_put_io_channel((*hello_context).bdev_io_channel);
-                raw::spdk_bdev_close((*hello_context).bdev_desc);
-                raw::spdk_app_stop(-1);
-                return;
-            }
-
-            let owned_fmt = CString::new("%s\n").unwrap();
-            let fmt: *const c_char = owned_fmt.as_ptr();
-            let owned_content = CString::new("Hello World!\n").unwrap();
-            let content: *const c_char = owned_content.as_ptr();
-            raw::snprintf((*hello_context).buff, blk_size as usize, fmt, content);
-
-            println!("Writing to the bdev");
-            let hello_context_ptr: *mut c_void = hello_context as *mut _ as *mut c_void;
-            rc = raw::spdk_bdev_write(
-                (*hello_context).bdev_desc,
-                (*hello_context).bdev_io_channel,
-                (*hello_context).buff as *mut c_void,
-                0,
-                blk_size as u64,
-                Some(write_complete),
-                hello_context_ptr,
-            );
-            if rc != 0 {
-                println!(
-                    "{0} error while writing to bdev: {1}",
-                    CStr::from_ptr(raw::spdk_strerror(-rc)).to_str().unwrap(),
-                    rc
-                );
-                raw::spdk_bdev_close((*hello_context).bdev_desc);
-                raw::spdk_put_io_channel((*hello_context).bdev_io_channel);
-                raw::spdk_app_stop(-1);
-                return;
-            }
-        }
-    }
-
-    #[test]
-    fn test_main() {
-        println!("Enter test_main");
-
-        unsafe {
-            let mut opts: raw::spdk_app_opts;
-            opts = mem::uninitialized();
-            raw::spdk_app_opts_init(&mut opts);
-
-            let mut hello_context: hello_context_t = mem::uninitialized();
-
-            let owned_name = CString::new("hello_bdev").unwrap();
-            opts.name = owned_name.as_ptr();
-
-            let owned_config_file =
-                CString::new("/home/zeyuanhu/rustfs/examples/hello_nvme_bdev/bdev.conf").unwrap();
-            opts.config_file = owned_config_file.as_ptr();
-
-            let owned_bdev_name = CString::new("Nvme0n1").unwrap();
-            hello_context.bdev_name = owned_bdev_name.as_ptr();
-
-            let hello_context_ptr: *mut c_void = &mut hello_context as *mut _ as *mut c_void;
-            let rc: c_int = raw::spdk_app_start(
-                &mut opts,
-                Some(hello_start),
-                hello_context_ptr,
-                ptr::null_mut(),
-            );
-            if rc != 0 {
-                panic!("ERROR starting application");
-            }
-
-            raw::spdk_dma_free(hello_context.buff as *mut c_void);
-
-            raw::spdk_app_fini();
-        }
     }
 }
