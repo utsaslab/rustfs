@@ -4,9 +4,11 @@ use crate::file;
 use crate::inode;
 
 use constants::{BLOCK_SIZE, DIR_TYPE, INODE_SIZE};
+use crate::file::DirectoryContent;
 use device::Device;
 use failure::Error;
 use file::File;
+use file::File::Directory;
 use inode::Inode;
 
 #[derive(Debug, Fail)]
@@ -17,11 +19,11 @@ pub enum BitmapErr {
 
 pub struct Bitmap {
     bitmap: Vec<u8>,
-    offset: u64, // base offset on SSD
+    offset: usize, // base offset on SSD
 }
 
 impl Bitmap {
-    pub fn new(offset: u64, size: usize) -> Bitmap {
+    pub fn new(offset: usize, size: usize) -> Bitmap {
         Bitmap {
             bitmap: vec![0; size],
             offset: offset,
@@ -42,7 +44,7 @@ impl Bitmap {
     }
 
     // find and set
-    fn find(&mut self) -> Result<usize, Error> {
+    pub fn find(&mut self) -> Result<usize, Error> {
         for byte in &mut self.bitmap {
             if !(*byte) != 0 {
                 let mut mask = 1;
@@ -60,19 +62,19 @@ impl Bitmap {
     }
 }
 
-pub struct FS {
-    device: Device,
+pub struct FS<'r> {
+    pub device: Device,
     //    data_bitmap_base: usize,
     //    inode_bitmap_base: usize,
-    inode_base: usize,
-    data_base: usize,
-    inode_bitmap: Bitmap,
-    data_bitmap: Bitmap,
-    root: Inode,
+    pub inode_base: usize,
+    pub data_base: usize,
+    pub inode_bitmap: Bitmap,
+    pub data_bitmap: Bitmap,
+    pub root: Option<File<'r>>,
 }
 
-impl FS {
-    pub fn new() -> FS {
+impl<'r> FS<'r> {
+    pub fn new() -> FS<'r> {
         let device = Device::new();
         let blk_size = device.blk_size();
         FS {
@@ -86,61 +88,65 @@ impl FS {
     }
 
     pub fn alloc_block(&mut self) -> usize {
-        let index = &self.data_bitmap.find()?;
-        let offset = index * &self.device.blk_size + &self.data_base;
+        let index = &self.data_bitmap.find().unwrap();
+        let offset = index * &self.device.blk_size() + &self.data_base;
         let zero_buf =
-            spdk_rs::env::dma_zmalloc(&self.device.blk_size as usize, &self.device.buf_align);
+            spdk_rs::env::dma_zmalloc(self.device.blk_size(), self.device.buf_align);
         &mut self
             .device
-            .write(&mut zero_buf, offset, &self.device.blk_size);
-        offset / &self.device.blk_size
+            .write(&zero_buf, offset, self.device.blk_size());
+        offset / self.device.blk_size()
     }
 
-    pub fn mkfs(&mut self) {
+    pub fn mkfs(&'r mut self) {
         let zero_buf =
-            spdk_rs::env::dma_zmalloc(&self.device.blk_size as usize, &self.device.buf_align);
-        let &mut write_buf =
-            spdk_rs::env::dma_zmalloc(&self.device.blk_size as usize, &self.device.buf_align);
-        write_buf.fill(&self.device.blk_size as usize, "%s", "RustFS--");
-        &mut self.device.write(&write_buf, 0, &self.device.blk_size);
+            spdk_rs::env::dma_zmalloc(self.device.blk_size(), self.device.buf_align);
+        let mut write_buf =
+            spdk_rs::env::dma_zmalloc(self.device.blk_size(), self.device.buf_align);
+        write_buf.fill(self.device.blk_size(), "%s", "RustFS--");
+        &mut self.device.write(&write_buf, 0, self.device.blk_size());
 
         // Define - root lives in first inode
-        let byte: u8 = 1;
-        write_buf.fill(&self.device.blk_size as usize, "%s", byte.to_string());
+        let byte:[u8;1] = [1;1];
+        write_buf.fill_bytes(&byte[..]);
         &mut self
             .device
-            .write(&write_buf, &self.device.blk_size, &self.device.blk_size);
+            .write(&write_buf, self.device.blk_size(), self.device.blk_size());
         &mut self
             .device
-            .write(&zero_buf, 2 * &self.device.blk_size, &self.device.blk_size);
-        let root = inode::Inode::new(&mut self, DIR_TYPE, 0);
-        write_buf.fill(&self.device.blk_size as usize, "%s\n", root.to_string());
-        &mut self
-            .device
-            .write(&write_buf, 3 * &self.device.blk_size, &self.device.blk_size);
+            .write(&zero_buf, 2 * self.device.blk_size(), self.device.blk_size());
+        let mut root_inode = inode::Inode::new(&mut self, DIR_TYPE, 0);
+        root_inode.get_or_alloc_page(0);
+        root_inode.write_inode();
+        self.make_root(root_inode);
     }
 
     pub fn mount(&mut self) {
-        let &mut read_buf =
-            spdk_rs::env::dma_zmalloc(&self.device.blk_size as usize, &self.device.buf_align);
+        let mut read_buf =
+            spdk_rs::env::dma_zmalloc(self.device.blk_size(), self.device.buf_align);
         &mut self
             .device
-            .read(&read_buf, &self.device.blk_size, &self.device.blk_size);
-        self.inode_bitmap.bitmap = read_buf.read();
+            .read(&mut read_buf, self.device.blk_size(), self.device.blk_size());
+        self.inode_bitmap.bitmap.copy_from_slice(read_buf.read_bytes(self.device.blk_size()));
         &mut self
             .device
-            .read(&read_buf, 2 * &self.device.blk_size, &self.device.blk_size);
-        self.data_bitmap.bitmap = read_buf.read();
+            .read(&mut read_buf, 2 * self.device.blk_size(), self.device.blk_size());
+        self.data_bitmap.bitmap.copy_from_slice(read_buf.read_bytes(self.device.blk_size()));
         &mut self
             .device
-            .read(&read_buf, 3 * &self.device.blk_size, &self.device.blk_size);
-        let inode = read_buf.read().to_string().parse::<Inode>().unwrap;
-        self.root = inode;
+            .read(&mut read_buf, 3 * self.device.blk_size(), self.device.blk_size());
+        let root_inode:Inode;
+        root_inode.read_inode();
+        self.make_root(root_inode);
     }
 
-    // pub fn root(&self) -> File::DataFile {
-    //     File::Datafile(&self.root.unwrap())
-    // }
+    fn make_root(&mut self, root_inode: Inode<'r>) {
+        let dir_content = DirectoryContent {
+            entries: None,
+            inode: root_inode,
+        };
+        self.root = Some(Directory(dir_content));
+    }
     /*
     pub fn find(String path){
 
