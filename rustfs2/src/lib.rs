@@ -14,12 +14,14 @@ extern crate bincode;
 #[macro_use]
 extern crate serde_derive;
 extern crate serde;
+#[macro_use]
+extern crate lazy_static;
 
 mod bitmap;
-mod constants;
 mod constants;
 mod device;
 mod file;
 mod fs;
+mode inode;
 
 pub use fs::FS;

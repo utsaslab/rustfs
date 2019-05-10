@@ -14,10 +14,15 @@ use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::Path;
 use std::process;
 use std::thread;
+use std::rc::Rc;
 
 use crate::constants::{
     DEFAULT_SERVER1_SOCKET_PATH, DEFAULT_SERVER2_SOCKET_PATH, FS_MKFS, FS_OPEN, FS_SHUTDOWN,
 };
+
+// A global reference to device struct
+static mut dev: Option<Device> = None;
+static mut fs_internal: Option<FsInternal> = None;
 
 #[derive(PartialEq, Debug, Clone, Copy)]
 enum FsOps {
@@ -94,8 +99,6 @@ fn handle_server1(stream: UnixStream) -> FsOps {
 
 #[allow(unused_variables)]
 async fn start_server2(poller: spdk_rs::io_channel::PollerHandle) {
-    let device = Device::new();
-
     let listener = match UnixListener::bind(DEFAULT_SERVER2_SOCKET_PATH) {
         Ok(sock) => sock,
         Err(e) => {
@@ -106,7 +109,7 @@ async fn start_server2(poller: spdk_rs::io_channel::PollerHandle) {
     for stream in listener.incoming() {
         match stream {
             Ok(stream) => {
-                // at least a async call to open can work but it is not right because we can now only handle one client at a time.
+                // At least a async call to open can work but it is not right because we can now only handle one client at a time.
                 // This might cause problem as if the application directly talks to server2, then there is only one socket available
                 // and thus, the request first connected gets advantage: we always wait for its requests until it disconnected.
                 // This limitation majorly due to our SPDK async has to poll on the current thread (i.e., cannot poll in different thread;
@@ -115,15 +118,15 @@ async fn start_server2(poller: spdk_rs::io_channel::PollerHandle) {
                 let stream = BufReader::new(stream);
                 for line in stream.lines() {
                     match line.unwrap().as_str() {
-                        FS_OPEN => match await!(FS::open()) {
-                            Ok(_) => {}
-                            Err(error) => panic!("{:?}", error),
-                        },
-                        FS_SHUTDOWN => break,
-                        FS_MKFS => match await!(FS::mkfs()) {
+                        FS_OPEN => match await!(FsInternal::open()) {
                             Ok(_) => {}
                             Err(error) => panic!("{:?}", error),
                         }
+                        FS_SHUTDOWN => break,
+                        FS_MKFS => match await!(FsInternal::mkfs()) {
+                            Ok(_) => {}
+                            Err(error) => panic!("{:?}", error)
+                        },   
                         _ => {}
                     };
                 }
@@ -161,7 +164,19 @@ fn start_spdk<
     println!("Successfully shutdown SPDK framework");
 }
 
-pub struct FsInternal<'r> {
+// pub struct FsInternal<'r> {
+//     pub device: Device,
+//     //    data_bitmap_base: usize,
+//     //    inode_bitmap_base: usize,
+//     pub inode_base: usize,
+//     pub data_base: usize,
+//     pub inode_bitmap: Bitmap,
+//     pub data_bitmap: Bitmap,
+//     //pub root: Option<File<'r>>,
+// }
+
+/// Internal FS state data structure
+pub struct FsInternal {
     pub device: Device,
     //    data_bitmap_base: usize,
     //    inode_bitmap_base: usize,
@@ -169,9 +184,52 @@ pub struct FsInternal<'r> {
     pub data_base: usize,
     pub inode_bitmap: Bitmap,
     pub data_bitmap: Bitmap,
-    //pub root: Option<File<'r>>,
+    //pub root: Option<File<'r>>,    
 }
 
+impl FsInternal {    
+    /// Open()
+    async fn open() -> Result<(), Error> {
+        unimplemented!();
+    }
+
+    /// mkfs()
+    async fn mkfs() -> Result<(), Error> {
+        unsafe {
+            dev = Some(Device::new());
+        }
+        let device = dev.unwrap();
+        let blk_size = device.blk_size();
+        unsafe {
+            fs_internal = Some(FsInternal {
+                device: device,
+                inode_base: 3 * blk_size,
+                data_base: 3 * blk_size + INODE_SIZE * blk_size * 8,
+                inode_bitmap: Bitmap::new(blk_size, blk_size),
+                data_bitmap: Bitmap::new(2 * blk_size, blk_size),
+                //root: None,
+            });
+        }
+        // Let's persistent the FS structure onto disk
+        let zero_buf = spdk_rs::env::dma_zmalloc(device.blk_size(), device.buf_align());
+        let mut write_buf = spdk_rs::env::dma_zmalloc(device.blk_size(), device.buf_align());
+        write_buf.fill(device.blk_size(), "%s", "RustFS--");
+        await!(device.write(&write_buf, 0, device.blk_size()))?;
+
+        // Define - root lives in first inode
+        let byte: [u8; 1] = [1; 1];
+        write_buf.fill_bytes(&byte[..]);
+        await!(device.write(&write_buf, device.blk_size(), device.blk_size()))?;
+        await!(device.write(&zero_buf, 2 * device.blk_size(), device.blk_size()))?;
+        //let root_inode = inode::Inode::new(&mut self, DIR_TYPE, 0);
+        //root_inode.get_or_alloc_page(0);
+        //root_inode.write_inode();
+        //self.make_root(root_inode);
+        Ok(())
+    }
+}
+
+/// Public API for the user
 pub struct FS {}
 
 impl FS {
@@ -203,42 +261,7 @@ impl FS {
         }
     }
 
-    /// Open()
-async fn open() -> Result<(), Error> {
-    unimplemented!();
-}
-
-
-    async fn mkfs() -> Result<(), Error> {
-        let device = Device::new();
-        let blk_size = device.blk_size();
-        // FS {
-        //     device: device,
-        //     inode_base: 3 * blk_size,
-        //     data_base: 3 * blk_size + INODE_SIZE * blk_size * 8,
-        //     inode_bitmap: Bitmap::new(blk_size as u64, blk_size),
-        //     data_bitmap: Bitmap::new(2 * blk_size as u64, blk_size),
-        //     root: None,
-        // };
-        // Let's persistent the FS structure onto disk
-        let zero_buf = spdk_rs::env::dma_zmalloc(device.blk_size(), device.buf_align());
-        let mut write_buf = spdk_rs::env::dma_zmalloc(device.blk_size(), device.buf_align());
-        write_buf.fill(device.blk_size(), "%s", "RustFS--");
-        await!(device.write(&write_buf, 0, device.blk_size()))?;
-
-        // Define - root lives in first inode
-        let byte: [u8; 1] = [1; 1];
-        write_buf.fill_bytes(&byte[..]);
-        await!(device.write(&write_buf, device.blk_size(), device.blk_size()))?;
-        await!(device.write(&zero_buf, 2 * device.blk_size(), device.blk_size()))?;
-        //let root_inode = inode::Inode::new(&mut self, DIR_TYPE, 0);
-        //root_inode.get_or_alloc_page(0);
-        //root_inode.write_inode();
-        //self.make_root(root_inode);
-        Ok(())
-    }
-
-    /// Open()
+    /// open()
     pub fn open() -> usize {
         let mut stream = UnixStream::connect(DEFAULT_SERVER1_SOCKET_PATH).unwrap();
         stream.write_all(FS_OPEN.as_bytes()).unwrap();
