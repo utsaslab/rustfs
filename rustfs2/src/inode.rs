@@ -70,8 +70,8 @@ impl Inode {
         ]));
     }
 
-    async pub fn read_file_from_inum(inum: usize) -> File {
-        let fs = fs_internal.unwrap();
+    pub async fn read_file_from_inum(inum: usize) -> File {
+        let fs = fs_internal.borrow();
         let blk_size = fs.device.blk_size();
         let offset = fs.inode_base + inum * INODE_SIZE;
 
@@ -93,19 +93,19 @@ impl Inode {
                 size: size,
                 single: Some(single),
                 double: Some(double),
-            }
+            };
+            match dirtype{
+                DIR_TYPE => { 
+                    let dir_content = DirectoryContent{
+                        entries: None,
+                        inode: inode,
+                    };
+                    Directory(dir_content)
+                },
+                FILE_TYPE => DataFile(inode),
+                _ => panic!("unknown dirtype {}", dirtype)
+            }                        
         }
-        match dirtype{
-            DIR_TYPE => { 
-                let dir_content = DirectoryContent{
-                    entries: None,
-                    inode: inode,
-                };
-                Directory(dir_content)
-            },
-            FILE_TYPE => DataFile(inode),
-            _ => panic!("unknown dirtype {}", dirtype)
-        }            
     }
 
     fn parse_entry(raw_read: &[u8], index: usize) -> usize {
@@ -120,7 +120,7 @@ impl Inode {
 
     async fn write_inode(&self) {
         // TODO: add unit test
-        let fs = fs_internal.unwrap();
+        let fs = fs_internal.borrow();
         let blk_size = fs.device.blk_size();
         let offset = fs.inode_base + self.inum * INODE_SIZE;
         let blk = offset / blk_size;

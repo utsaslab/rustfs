@@ -56,19 +56,23 @@ impl Bitmap {
     }
 
     pub async fn read_bitmap(&mut self) {
-        let fs = fs_internal.into_inner();
-        let blk_size = fs.device.blk_size();
-        let mut read_buf = spdk_rs::env::dma_zmalloc(blk_size, fs.device.buf_align());
-        await!(fs.device.read(&mut read_buf, self.offset, blk_size));
-        let mut buf = read_buf.read_bytes(blk_size);
-        self.bitmap.copy_from_slice(&buf[0..blk_size]);
+        unsafe {
+            let fs = fs_internal.borrow();
+            let blk_size = fs.device.blk_size();
+            let mut read_buf = spdk_rs::env::dma_zmalloc(blk_size, fs.device.buf_align());
+            await!(fs.device.read(&mut read_buf, self.offset, blk_size));
+            let mut buf = read_buf.read_bytes(blk_size);
+            self.bitmap.copy_from_slice(&buf[0..blk_size]);
+        }
     }
 
     pub async fn write_bitmap(&self) {
-        let fs = fs_internal.into_inner();
-        let blk_size = fs.device.blk_size();
-        let mut write_buf = spdk_rs::env::dma_zmalloc(blk_size, fs.device.buf_align());
-        write_buf.fill_bytes(&self.bitmap[0..blk_size]);
-        await!(fs.device.write(&write_buf, self.offset, blk_size));            
+        unsafe {
+            let fs = fs_internal.borrow();
+            let blk_size = fs.device.blk_size();
+            let mut write_buf = spdk_rs::env::dma_zmalloc(blk_size, fs.device.buf_align());
+            write_buf.fill_bytes(&self.bitmap[0..blk_size]);
+            await!(fs.device.write(&write_buf, self.offset, blk_size));
+        }
     }
 }

@@ -97,11 +97,7 @@ impl FileHandle {
         }
     }
 
-<<<<<<< HEAD
     pub async fn read<'a>(&'a self, dst: &'a mut [u8]) -> usize {
-=======
-    pub async fn read(&self, dst: &mut [u8]) -> usize {
->>>>>>> a17418ea523c0af527c906ebcbf965b099e88a03
         let offset = self.seek.get();
         let inode = self.file.get_inode();
         let changed = await!(inode.read(offset, dst));
@@ -109,13 +105,9 @@ impl FileHandle {
         changed
     }
 
-<<<<<<< HEAD
     pub async fn write<'a>(&'a mut self, src: &'a [u8]) -> usize {
-=======
-    pub async fn write(&mut self, src: &[u8]) -> usize {
->>>>>>> a17418ea523c0af527c906ebcbf965b099e88a03
         let offset = self.seek.get();
-        let inode = self.file.get_inode();
+        let mut inode = self.file.get_inode();
         let changed = await!(inode.write(offset, src));
         self.seek.set(offset + changed);
         changed
