@@ -15,8 +15,11 @@ extern crate bincode;
 extern crate serde_derive;
 extern crate serde;
 
-mod device;
+mod bitmap;
 mod constants;
+mod constants;
+mod device;
+mod file;
 mod fs;
 
 pub use fs::FS;

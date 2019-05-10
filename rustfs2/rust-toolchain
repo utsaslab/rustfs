@@ -1,2 +1,2 @@
 nightly-2019-01-11
-rustup component add rustfmt
+rustup component add rustfmt --toolchain nightly-2019-01-11-x86_64-unknown-linux-gnu

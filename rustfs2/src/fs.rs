@@ -1,6 +1,9 @@
 //! file system interface
-
+use crate::bitmap::Bitmap;
+use crate::constants::INODE_SIZE;
 use crate::device::Device;
+use crate::file::{DirectoryContent, File, File::Directory};
+use failure::Error;
 use nix::sys::signal::*;
 use nix::unistd::*;
 use std::fs;
@@ -11,14 +14,14 @@ use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::Path;
 use std::process;
 use std::thread;
-use failure::Error;
 
-
-use crate::constants::{DEFAULT_SERVER1_SOCKET_PATH, DEFAULT_SERVER2_SOCKET_PATH, FS_SHUTDOWN, FS_OPEN};
+use crate::constants::{
+    DEFAULT_SERVER1_SOCKET_PATH, DEFAULT_SERVER2_SOCKET_PATH, FS_MKFS, FS_OPEN, FS_SHUTDOWN,
+};
 
 #[derive(PartialEq, Debug, Clone, Copy)]
-enum FS_OPS {
-    NO_OP,
+enum FsOps {
+    NOOP,
     SHUTDOWN,
     OPEN,
     UNSUPPORTED,
@@ -34,34 +37,28 @@ struct message {
 
 impl message {
     fn shutdown_msg() -> message {
-        message {
-            ops: FS_SHUTDOWN,
-        }
+        message { ops: FS_SHUTDOWN }
     }
 
     fn open_msg() -> message {
-        message {
-            ops: FS_OPEN,
-        }
+        message { ops: FS_OPEN }
     }
 }
 
-
 /// Handle the request from application
-fn handle_client(stream: UnixStream) -> FS_OPS {
+fn handle_client(stream: UnixStream) -> FsOps {
     let stream = BufReader::new(stream);
     for line in stream.lines() {
         match line.unwrap().as_str() {
-            FS_SHUTDOWN => return FS_OPS::SHUTDOWN,
-            FS_OPEN => {
-                FS_OPS::OPEN
-            }
-            _ => FS_OPS::UNSUPPORTED
+            FS_SHUTDOWN => return FsOps::SHUTDOWN,
+            FS_OPEN => FsOps::OPEN,
+            _ => FsOps::UNSUPPORTED,
         };
     }
-    FS_OPS::NO_OP
+    FsOps::NOOP
 }
 
+/// Start server1 and handle the connection based on operations
 fn start_server1() {
     let listener = UnixListener::bind(DEFAULT_SERVER1_SOCKET_PATH).unwrap();
     for stream in listener.incoming() {
@@ -70,7 +67,7 @@ fn start_server1() {
                 let handle = thread::spawn(|| handle_client(stream));
                 let res = handle.join().unwrap();
                 dbg!(res);
-                if res == FS_OPS::SHUTDOWN {
+                if res == FsOps::SHUTDOWN {
                     break;
                 }
             }
@@ -83,28 +80,22 @@ fn start_server1() {
 }
 
 /// Handle the request from server1
-fn handle_server1(stream: UnixStream) -> FS_OPS {
+fn handle_server1(stream: UnixStream) -> FsOps {
     let stream = BufReader::new(stream);
     for line in stream.lines() {
         match line.unwrap().as_str() {
-            FS_SHUTDOWN => return FS_OPS::SHUTDOWN,
-            FS_OPEN => {
-                FS_OPS::OPEN
-            },
-            _ => FS_OPS::UNSUPPORTED,
-        };       
+            FS_SHUTDOWN => return FsOps::SHUTDOWN,
+            FS_OPEN => FsOps::OPEN,
+            _ => FsOps::UNSUPPORTED,
+        };
     }
-    FS_OPS::NO_OP
-}
-
-/// Open()
-async fn open() -> Result<(), Error> {
-    unimplemented!();
+    FsOps::NOOP
 }
 
 #[allow(unused_variables)]
 async fn start_server2(poller: spdk_rs::io_channel::PollerHandle) {
     let device = Device::new();
+
     let listener = match UnixListener::bind(DEFAULT_SERVER2_SOCKET_PATH) {
         Ok(sock) => sock,
         Err(e) => {
@@ -124,18 +115,18 @@ async fn start_server2(poller: spdk_rs::io_channel::PollerHandle) {
                 let stream = BufReader::new(stream);
                 for line in stream.lines() {
                     match line.unwrap().as_str() {
-                        FS_OPEN => {
-                            await!(open());
+                        FS_OPEN => match await!(FS::open()) {
+                            Ok(_) => {}
+                            Err(error) => panic!("{:?}", error),
                         },
+                        FS_SHUTDOWN => break,
+                        FS_MKFS => match await!(FS::mkfs()) {
+                            Ok(_) => {}
+                            Err(error) => panic!("{:?}", error),
+                        }
                         _ => {}
                     };
                 }
-                // let handle = thread::spawn(|| handle_server1(stream));
-                // let res = handle.join().unwrap();
-                // dbg!(res);
-                // if res == FS_OPS::SHUTDOWN {
-                //     break;
-                // }
             }
             Err(err) => {
                 println!("Error: {}", err);
@@ -170,6 +161,17 @@ fn start_spdk<
     println!("Successfully shutdown SPDK framework");
 }
 
+pub struct FsInternal<'r> {
+    pub device: Device,
+    //    data_bitmap_base: usize,
+    //    inode_bitmap_base: usize,
+    pub inode_base: usize,
+    pub data_base: usize,
+    pub inode_bitmap: Bitmap,
+    pub data_bitmap: Bitmap,
+    //pub root: Option<File<'r>>,
+}
+
 pub struct FS {}
 
 impl FS {
@@ -199,6 +201,41 @@ impl FS {
                 Ok(())
             }
         }
+    }
+
+    /// Open()
+async fn open() -> Result<(), Error> {
+    unimplemented!();
+}
+
+
+    async fn mkfs() -> Result<(), Error> {
+        let device = Device::new();
+        let blk_size = device.blk_size();
+        // FS {
+        //     device: device,
+        //     inode_base: 3 * blk_size,
+        //     data_base: 3 * blk_size + INODE_SIZE * blk_size * 8,
+        //     inode_bitmap: Bitmap::new(blk_size as u64, blk_size),
+        //     data_bitmap: Bitmap::new(2 * blk_size as u64, blk_size),
+        //     root: None,
+        // };
+        // Let's persistent the FS structure onto disk
+        let zero_buf = spdk_rs::env::dma_zmalloc(device.blk_size(), device.buf_align());
+        let mut write_buf = spdk_rs::env::dma_zmalloc(device.blk_size(), device.buf_align());
+        write_buf.fill(device.blk_size(), "%s", "RustFS--");
+        await!(device.write(&write_buf, 0, device.blk_size()))?;
+
+        // Define - root lives in first inode
+        let byte: [u8; 1] = [1; 1];
+        write_buf.fill_bytes(&byte[..]);
+        await!(device.write(&write_buf, device.blk_size(), device.blk_size()))?;
+        await!(device.write(&zero_buf, 2 * device.blk_size(), device.blk_size()))?;
+        //let root_inode = inode::Inode::new(&mut self, DIR_TYPE, 0);
+        //root_inode.get_or_alloc_page(0);
+        //root_inode.write_inode();
+        //self.make_root(root_inode);
+        Ok(())
     }
 
     /// Open()

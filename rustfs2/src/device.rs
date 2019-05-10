@@ -10,7 +10,7 @@ use spdk_rs::thread::SpdkIoChannel;
 pub struct Device {
     desc: SpdkBdevDesc,
     io_channel: SpdkIoChannel,
-    pub buf_align: usize,
+    buf_align: usize,
     blk_size: usize,
 }
 
@@ -65,6 +65,10 @@ impl Device {
 
     pub fn blk_size(&self) -> usize {
         self.blk_size
+    }
+
+    pub fn buf_align(&self)-> usize {
+        self.buf_align
     }
 }
 
