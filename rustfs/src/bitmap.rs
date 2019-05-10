@@ -94,11 +94,11 @@ impl<'r> FS<'r> {
             spdk_rs::env::dma_zmalloc(self.device.blk_size(), self.device.buf_align);
         &mut self
             .device
-            .write(&mut zero_buf, offset, self.device.blk_size());
+            .write(&zero_buf, offset, self.device.blk_size());
         offset / self.device.blk_size()
     }
 
-    pub fn mkfs(&mut self) {
+    pub fn mkfs(&'r mut self) {
         let zero_buf =
             spdk_rs::env::dma_zmalloc(self.device.blk_size(), self.device.buf_align);
         let mut write_buf =
@@ -115,7 +115,7 @@ impl<'r> FS<'r> {
         &mut self
             .device
             .write(&zero_buf, 2 * self.device.blk_size(), self.device.blk_size());
-        let root_inode = inode::Inode::new(&mut self, DIR_TYPE, 0);
+        let mut root_inode = inode::Inode::new(&self, DIR_TYPE, 0);
         root_inode.get_or_alloc_page(0);
         root_inode.write_inode();
         self.make_root(root_inode);
@@ -140,7 +140,7 @@ impl<'r> FS<'r> {
         self.make_root(root_inode);
     }
 
-    fn make_root(&self, root_inode: Inode<'r>) {
+    fn make_root(&mut self, root_inode: Inode<'r>) {
         let dir_content = DirectoryContent {
             entries: None,
             inode: root_inode,

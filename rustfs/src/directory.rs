@@ -1,11 +1,12 @@
 use crate::file;
-
 use crate::inode::Inode;
 use file::File;
 use file::File::{Directory, DataFile};
 use file::DirectoryContent;
 use std::collections::HashMap;
 use std::mem;
+use std::str;
+use std::string::String;
 
 pub trait DirectoryHandle<'r>: Sized {
     fn is_dir(&self) -> bool;
@@ -25,7 +26,7 @@ impl<'r> DirectoryHandle<'r> for File<'r> {
     }
 
     fn insert(&mut self, name: &'r str, file: File<'r>) {
-        let dc = match self{
+        let mut dc = match self{
              &mut Directory(dir_content) => dir_content,
              _ => panic!("not a dir"),
         };
@@ -147,12 +148,13 @@ impl<'r> DirectoryHandle<'r> for File<'r> {
             let curr_inum = match curr_file {
                 DataFile(inode) => inode.inum,
                 Directory(dirc) => dirc.inode.inum,
+                _ => panic!("empty file!"),
             };
             let mut this_entry = &mut write_buf[start..(start+128)];
             unsafe{
                 let tmp = mem::transmute::<usize, [u8; 8]>(curr_inum);
                 this_entry[0..8].copy_from_slice(&tmp[0..8]);
-                let source = self.name.as_bytes();
+                let source = name.as_bytes();
                 for i in 0..120 {
                     if i < source.len() { 
                         this_entry[i+8] = source[i];

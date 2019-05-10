@@ -16,13 +16,6 @@ pub struct Device {
 
 impl Device {
     pub fn new() -> Device {
-        let mut first_bdev = bdev::first();
-        while !first_bdev.is_none() {
-            let bdev = first_bdev.unwrap();
-            println!("bdev name: {}", bdev.name());
-            first_bdev = bdev::next(&bdev);
-        }
-
         let ret = bdev::get_by_name("Malloc0");
         let bdev = ret.unwrap();
         let mut desc = SpdkBdevDesc::new();
@@ -41,25 +34,33 @@ impl Device {
             blk_size: blk_size as usize,
         }
     }
-    // nbytes = blk_size?
-    pub fn read(&self, read_buf: &mut env::Buf, offset: usize, nbytes: usize) -> Result<(), Error> {
-        await!(bdev::read(
-            self.desc.clone(),
-            &self.io_channel,
-            &mut read_buf,
-            offset as u64,
-            nbytes as u64
-        ))
+
+    pub async fn read<'a>(&'a self, read_buf: &'a mut env::Buf, offset: usize, nbytes: usize) -> Result<(), Error> {
+        match await!(bdev::read(
+                self.desc.clone(),
+                &self.io_channel,
+                read_buf,
+                offset as u64,
+                nbytes as u64
+        )) {
+            Ok(_) => {}
+            Err(error) => panic!("{:?}", error),
+        };
+        Ok(())
     }
 
-    pub fn write(&self, write_buf: &env::Buf, offset: usize, nbytes: usize) -> Result<(), Error> {
-        await!(bdev::write(
-            self.desc.clone(),
-            &self.io_channel,
-            write_buf,
-            offset as u64,
-            nbytes as u64
-        ))
+    pub async fn write<'a>(&'a self, write_buf: &'a env::Buf, offset: usize, nbytes: usize) -> Result<(), Error> {
+        match await!(bdev::write(
+                self.desc.clone(),
+                &self.io_channel,
+                &write_buf,
+                offset as u64,
+                nbytes as u64
+        )) {
+            Ok(_) => {}
+            Err(error) => panic!("{:?}", error),
+        }
+        Ok(())
     }
 
     pub fn blk_size(&self) -> usize {
@@ -69,8 +70,8 @@ impl Device {
 
 impl Drop for Device {
     fn drop(&mut self) {
-        spdk_rs::thread::put_io_channel(self.io_channel);
-        bdev::close(self.desc);
+        spdk_rs::thread::put_io_channel(self.io_channel.clone());
+        bdev::close(self.desc.clone());
         spdk_rs::event::app_stop(true);
     }
 }

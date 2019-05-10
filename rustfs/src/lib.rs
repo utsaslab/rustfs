@@ -28,7 +28,7 @@ pub use file::Whence;
 pub use inode::Inode;
 
 pub type FileDescriptor = isize;
-pub static mut fs: FS = FS::new();
+//pub static mut fs: FS = FS::new();
 
 pub struct Proc<'r> {
     fs: &'r FS<'r>,
@@ -68,7 +68,7 @@ impl<'r> Proc<'r> {
                     // TODO: write to disk here
                     self.cwd.insert(path, file.clone());
                     inode.write_inode();
-                    match self.cwd {
+                    match &self.cwd {
                         Directory(dc) => dc.inode.write_inode(),
                         _ => {}
                     }
