@@ -64,7 +64,7 @@ impl<'r> DirectoryHandle<'r> for File<'r> {
         //        let rc = self.get_dir_rc();
         // let mut content = rc.borrow_mut();
         // content.entries.remove(&name);
-        unimplemented!();
+        // unimplemented!();
     }
 
     fn get(&self, name: &'r str) -> Option<File<'r>> {
@@ -104,16 +104,17 @@ impl<'r> DirectoryHandle<'r> for File<'r> {
             Some(hm) => hm,
         };
         let data:Vec<u8> = vec![0; dc.inode.size()]; 
-        let slice = &mut data[..];
-        dc.inode.read(0, &mut slice);
+        let read_buf = &mut data[..];
+        dc.inode.read(0, &mut read_buf);
         let iters:usize = dc.inode.size() / 128;
         for i in 0..(iters+1) {
             let inum: usize;
             let name: &str;
             let start = 128 * iters;
             unsafe{
-                inum = mem::transmute::<[u8; 8], usize>(*array_ref![slice, start, 8]);
-                name = mem::transmute::<[u8; 120], &str>(*array_ref![slice, start+8, 120]);
+                inum = mem::transmute::<[u8; 8], usize>(*array_ref![read_buf, start, 8]);
+                name = str::from_utf8(&read_buf[8..128]).expect("Found invalid UTF-8");
+                name = name.trim_matches(char::from(0));
             }
             let curr_inode = Inode::new(dc.inode.fs, 0, inum);
             curr_inode.read_inode();
@@ -149,16 +150,16 @@ impl<'r> DirectoryHandle<'r> for File<'r> {
             };
             let mut this_entry = &mut write_buf[start..(start+128)];
             unsafe{
-                // TODO: array_ref?
                 let tmp = mem::transmute::<usize, [u8; 8]>(curr_inum);
                 this_entry[0..8].copy_from_slice(&tmp[0..8]);
-//                let mut tmp = &mut write_buf[(start+8)..(start+128)];
-//                let slice = name.as_bytes();
-                let tmp = mem::transmute::<&str, [u8; 120]>(name);
-//                for i in 0..120 {
-//                    *tmp[]
-//                }
-                this_entry[8..128].copy_from_slice(&slice[0..120]);
+                let source = self.name.as_bytes();
+                for i in 0..120 {
+                    if i < source.len() { 
+                        this_entry[i+8] = source[i];
+                    }else{
+                        this_entry[i+8] = 0;
+                    }
+                }
             }
         }
         dc.inode.write(0, &write_buf);
