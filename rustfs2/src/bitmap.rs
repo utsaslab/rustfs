@@ -60,8 +60,25 @@ impl Bitmap {
         println!("*** Bitmap full");
         Err(BitmapErr::Full())?
     }
-}
 
+    pub fn read_bitmap(&mut self) {
+        let device = dev.unwrap();
+        let blk_size = device.blk_size();
+        let mut read_buf = spdk_rs::env::dma_zmalloc(blk_size, device.buf_align());
+        await!(device.read(&mut read_buf, self.offset, blk_size))?;
+        let mut buf = read_buf.read_bytes(blk_size);
+        self.bitmap.copy_from_slice(&buf[0..blk_size]);
+    }
+
+    pub fn write_bitmap(&self) {
+        let device = dev.unwrap();
+        let blk_size = device.blk_size();
+        let write_buf = spdk_rs::env::dma_zmalloc(blk_size, device.buf_align());
+        write_buf.fill_bytes(&self.bitmap[0..blk_size]);
+        await!(device.write(&write_buf, self.offset, blk_size))?;
+    }
+}
+/*
 pub struct FS<'r> {
     pub device: Device,
     //    data_bitmap_base: usize,
@@ -147,9 +164,4 @@ impl<'r> FS<'r> {
         };
         self.root = Some(Directory(dir_content));
     }
-    /*
-    pub fn find(String path){
-
-    }
-    */
-}
+}*/
