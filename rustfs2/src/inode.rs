@@ -3,6 +3,7 @@ use crate::fs::{fs_internal, FsInternal};
 use std::mem;
 use std::ptr;
 use std::ptr::copy_nonoverlapping;
+use crate::file::{File, DirectoryContent, File::Directory, File::DataFile};
 use time;
 use time::Timespec;
 
@@ -49,7 +50,7 @@ impl Inode {
     }
 
     async fn read_inode(&self) {
-        let fs = fs_internal.unwrap();
+        let fs = fs_internal.into_inner();
         let offset = fs.inode_base + self.inum * INODE_SIZE;
         let blk = offset / BLOCK_SIZE;
         let blk_offset = offset % BLOCK_SIZE;
@@ -57,41 +58,40 @@ impl Inode {
         await!(fs.device.read(&mut read_buf, blk, BLOCK_SIZE));
         let mut buf = read_buf.read_bytes(BLOCK_SIZE);
         let mut content = &buf[blk_offset..blk_offset + INODE_SIZE];
-        unsafe {
-            self.dirtype = mem::transmute::<[u8; 8], usize>(*array_ref![content, 0, 8]);
-            self.size = mem::transmute::<[u8; 8], usize>(*array_ref![content, 8, 8]);
-            self.single = Some(mem::transmute::<[u8; 8], usize>(*array_ref![
-                content, 16, 8
-            ]));
-            self.double = Some(mem::transmute::<[u8; 8], usize>(*array_ref![
-                content, 24, 8
-            ]));
-        }
+
+        self.dirtype = mem::transmute::<[u8; 8], usize>(*array_ref![content, 0, 8]);
+        self.size = mem::transmute::<[u8; 8], usize>(*array_ref![content, 8, 8]);
+        self.single = Some(mem::transmute::<[u8; 8], usize>(*array_ref![
+            content, 16, 8
+        ]));
+        self.double = Some(mem::transmute::<[u8; 8], usize>(*array_ref![
+            content, 24, 8
+        ]));
     }
 
-    pub fn read_file_from_inum(inum: usize) -> File {
-        let device = dev.unwrap();
-        let inode_base = fs_internal.unwrap().inode_base;
-        let blk_size = device.blk_size();
+    pub async fn read_file_from_inum(inum: usize) -> File {
+        let fs = fs_internal.into_inner();
+        let inode_base = fs.inode_base;
+        let blk_size = fs.device.blk_size();
         let offset = inode_base + inum * INODE_SIZE;
         let blk = offset / blk_size;
-        let mut read_buf = spdk_rs::env::dma_zmalloc(blk_size, device.blk_align());
-        await!(device.read(&read_buf, blk, blk_size))?;
+        let blk_offset = offset % BLOCK_SIZE;        
+        let mut read_buf = spdk_rs::env::dma_zmalloc(blk_size, fs.device.buf_align());
+        await!(fs.device.read(&mut read_buf, blk, blk_size));
         let buf = read_buf.read_bytes(blk_size);
         let mut content = &buf[blk_offset..blk_offset + INODE_SIZE];
         let inode:Inode;
-        unsafe {
-            let dirtype = mem::transmute::<[u8; 8], usize>(*array_ref![content, 0, 8]);
-            let size = mem::transmute::<[u8; 8], usize>(*array_ref![content, 8, 8]);
-            let single = mem::transmute::<[u8; 8], usize>(*array_ref![content, 16, 8]);
-            let double = mem::transmute::<[u8; 8], usize>(*array_ref![content, 24, 8]);
-            inode = Inode {
-                dirtype: dirtype,
-                size: size,
-                single: Some(single),
-                double: Some(double),
-            }
-        }
+        let dirtype = mem::transmute::<[u8; 8], usize>(*array_ref![content, 0, 8]);
+        let size = mem::transmute::<[u8; 8], usize>(*array_ref![content, 8, 8]);
+        let single = mem::transmute::<[u8; 8], usize>(*array_ref![content, 16, 8]);
+        let double = mem::transmute::<[u8; 8], usize>(*array_ref![content, 24, 8]);
+        inode = Inode {
+            dirtype: dirtype,
+            size: size,
+            single: Some(single),
+            double: Some(double),
+            inum: inum
+        };
         match dirtype{
             DIR_TYPE => { 
                 let dir_content = DirectoryContent{
@@ -100,9 +100,9 @@ impl Inode {
                 };
                 Directory(dir_content)
             },
-            FILE_TYPE => DataFile(Inode),
+            FILE_TYPE => DataFile(inode),
             _ => panic!("unknown dirtype {}", dirtype)
-        }
+        }            
     }
 
     fn parse_entry(raw_read: &[u8], index: usize) -> usize {
@@ -117,7 +117,7 @@ impl Inode {
 
     async fn write_inode(&self) {
         // TODO: add unit test
-        let fs = fs_internal.unwrap();
+        let fs = fs_internal.into_inner();
         let offset = fs.inode_base + self.inum * INODE_SIZE;
         let blk = offset / BLOCK_SIZE;
         let blk_offset = offset % BLOCK_SIZE;
@@ -125,24 +125,23 @@ impl Inode {
         await!(fs.device.read(&mut read_buf, blk, BLOCK_SIZE));
         let mut buf = read_buf.read_bytes(BLOCK_SIZE);
         let mut content = &buf[blk_offset..blk_offset + INODE_SIZE];
-        unsafe {
-            let tmp = mem::transmute::<usize, [u8; 8]>(self.dirtype);
-            content[0..8].copy_from_slice(&tmp[0..8]);
-            let tmp = mem::transmute::<usize, [u8; 8]>(self.size);
-            content[8..16].copy_from_slice(&tmp[0..8]);
-            let tmp = mem::transmute::<usize, [u8; 8]>(self.single.unwrap());
-            content[16..24].copy_from_slice(&tmp[0..8]);
-            let tmp = mem::transmute::<usize, [u8; 8]>(self.double.unwrap());
-            content[24..32].copy_from_slice(&tmp[0..8]);
-        }
+        let tmp = mem::transmute::<usize, [u8; 8]>(self.dirtype);
+        content[0..8].copy_from_slice(&tmp[0..8]);
+        let tmp = mem::transmute::<usize, [u8; 8]>(self.size);
+        content[8..16].copy_from_slice(&tmp[0..8]);
+        let tmp = mem::transmute::<usize, [u8; 8]>(self.single.unwrap());
+        content[16..24].copy_from_slice(&tmp[0..8]);
+        let tmp = mem::transmute::<usize, [u8; 8]>(self.double.unwrap());
+        content[24..32].copy_from_slice(&tmp[0..8]);
         let mut write_buf = read_buf;
         write_buf.fill_bytes(buf);
-        await!(fs.device.write(&write_buf, blk, BLOCK_SIZE));
+        await!(fs.device.write(&write_buf, blk, BLOCK_SIZE));            
     }
 
     /// read inode metadata and return block number
     async fn get_or_alloc_page(&mut self, num: usize) -> usize {
-        let fs = fs_internal.unwrap();
+        unsafe {
+        let fs = fs_internal.borrow();
         if num >= LIST_SIZE + 1 {
             panic!("Maximum file size exceeded!")
         };
@@ -160,7 +159,7 @@ impl Inode {
                 //                    &mut self.read_inode();
                 //                }
             }
-            self.single.unwrap()
+        self.single.unwrap()
         } else {
             // if the page num is in the doubly-indirect list. We allocate a new
             // entry list where necessary (*entry_list = ...)
@@ -182,11 +181,12 @@ impl Inode {
         if need_update {
             self.write_inode();
         }
-        page
+            page
+        }
     }
 
     async fn get_page(&self, num: usize) -> usize {
-        let fs = fs_internal.unwrap();
+        let fs = fs_internal.into_inner();
         if num * BLOCK_SIZE >= self.size {
             panic!("Page does not exist.")
         };
@@ -204,8 +204,9 @@ impl Inode {
         }
     }
 
-    async fn write<'a>(&'a mut self, offset: usize, data: &'a [u8]) -> usize {
-        let fs = fs_internal.unwrap();
+    pub async fn write<'a>(&'a mut self, offset: usize, data: &'a [u8]) -> usize {
+        unsafe {
+        let fs = fs_internal.borrow();
         let mut written: usize = 0;
         let mut block_offset = offset % BLOCK_SIZE; // offset from first block
 
@@ -235,13 +236,15 @@ impl Inode {
             await!(fs.device.read(&mut read_buf, pg_offset, BLOCK_SIZE));
             let disk_page = read_buf.read_bytes(BLOCK_SIZE);
             // let slice = array_mut_ref![disk_page, block_offset, num_bytes];
-            let mut slice = &mut disk_page[block_offset..(block_offset + num_bytes)];
+            let slice = &disk_page[block_offset..(block_offset + num_bytes)];
             // written += slice.copy_from(data.slice(written, written + num_bytes));
-            unsafe {
-                // TODO: This may be extremely slow! Use copy_nonoverlapping, perhaps.
-                let src = data[written..(written + num_bytes)].as_ptr();
-                copy_nonoverlapping(src, slice.as_mut_ptr(), num_bytes);
-            }
+            //TODO: comment it out due to compilation error
+            // unsafe {
+            //     // TODO: This may be extremely slow! Use copy_nonoverlapping, perhaps.
+            //     let src = data[written..(written + num_bytes)].as_ptr();
+            //     copy_nonoverlapping(src, slice.as_mut_ptr(), num_bytes);
+            // }
+            // END TODO
             let mut write_buf = spdk_rs::env::dma_zmalloc(BLOCK_SIZE, 0);
             write_buf.fill_bytes(disk_page);
             await!(fs.device.write(&mut write_buf, offset, BLOCK_SIZE));
@@ -254,10 +257,12 @@ impl Inode {
         //        let time_now = time::get_time();
         //        self.mod_time = time_now;
         //        self.access_time = time_now;
-        written
+            written
+        }
     }
 
-    pub fn read(&self, offset: usize, data: &mut [u8]) -> usize {
+    pub async fn read<'a>(&'a self, offset: usize, data: &'a mut [u8]) -> usize {
+        let fs = fs_internal.into_inner();
         let mut read = 0;
         let mut block_offset = offset % BLOCK_SIZE; // offset from first block
         let start = offset / BLOCK_SIZE; // first block to act on
@@ -277,10 +282,10 @@ impl Inode {
                 BLOCK_SIZE - block_offset
             };
 
-            let page = self.get_page(start + i);
-            let pg_offset = self.fs.data_base + page * BLOCK_SIZE;
-            let mut read_buf = spdk_rs::env::dma_zmalloc(self.fs.device.blk_size(), 0);
-            self.fs.device.read(&mut read_buf, pg_offset, BLOCK_SIZE);
+            let page = await!(self.get_page(start + i));
+            let pg_offset = fs.data_base + page * BLOCK_SIZE;
+            let mut read_buf = spdk_rs::env::dma_zmalloc(fs.device.blk_size(), 0);
+            await!(fs.device.read(&mut read_buf, pg_offset, BLOCK_SIZE));
             let disk_page = read_buf.read_bytes(BLOCK_SIZE);
             // TODO: check compatability here
 
@@ -296,7 +301,7 @@ impl Inode {
             read += num_bytes;
         }
 
-        read
+            read
     }
 
     pub fn size(&self) -> usize {

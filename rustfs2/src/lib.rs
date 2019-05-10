@@ -1,5 +1,6 @@
 #![feature(uniform_paths)]
 #![feature(async_await, await_macro, futures_api)]
+#![feature(type_ascription)]
 
 #[macro_use]
 extern crate arrayref;
@@ -13,6 +14,7 @@ extern crate log;
 extern crate bincode;
 #[macro_use]
 extern crate serde_derive;
+
 extern crate serde;
 #[macro_use]
 extern crate lazy_static;

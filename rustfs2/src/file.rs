@@ -16,22 +16,22 @@ use std::rc::Rc;
 // provide a layer of indirection. FileHandle's and Directory entries, then,
 // point to these guys instead of directly to Inodes/Directories
 #[derive(Clone)]
-pub enum File<'r> {
+pub enum File {
     DataFile(Inode),
-    Directory(DirectoryContent<'r>),
+    Directory(DirectoryContent),
     EmptyFile,
 }
 
 #[derive(Clone)]
-pub struct FileHandle<'r> {
-    file: File<'r>,
+pub struct FileHandle {
+    file: File,
     seek: Cell<usize>,
 }
 
 // Preserve this and write to disk?
 #[derive(Clone)]
-pub struct DirectoryContent<'r> {
-    pub entries: Option<HashMap<&'r str, File<'r>>>,
+pub struct DirectoryContent {
+    pub entries: Option<HashMap<&'static str, File>>,
     pub inode: Inode,
 }
 
@@ -41,8 +41,8 @@ pub enum Whence {
     SeekEnd,
 }
 
-impl<'r> File<'r> {
-    pub fn new_dir(_parent: Option<File<'r>>) -> File<'r> {
+impl File {
+    pub fn new_dir(_parent: Option<File>) -> File {
         // let content = DirectoryContent {
         //     entries: HashMap::new(),
         //     inode: Inode { fs, DIR_TYPE, inum },
@@ -67,50 +67,50 @@ impl<'r> File<'r> {
         unimplemented!();
     }
 
-    pub fn new_data_file(inode: Inode) -> File<'r> {
+    pub fn new_data_file(inode: Inode) -> File {
         // TODO: write to disk ??
         DataFile(inode);
         unimplemented!();
     }
 
     pub fn get_dir_inode(&self) -> Inode {
-        match self {
-            &Directory(dir_content) => dir_content.inode,
+        match self.clone() {
+            Directory(dir_content) => dir_content.inode,
             _ => panic!("not a directory"),
         }
     }
 
     pub fn get_inode(&self) -> Inode {
-        match self {
-            &DataFile(inode) => inode,
+        match self.clone() {
+            DataFile(inode) => inode,
             _ => panic!("not a directory"),
         }
     }
 }
 
-impl<'r> FileHandle<'r> {
+impl FileHandle {
     // Probably not the right type.
-    pub fn new(file: File<'r>) -> FileHandle<'r> {
+    pub fn new(file: File) -> FileHandle {
         FileHandle {
             file: file,
             seek: Cell::new(0),
         }
     }
 
-    pub fn read(&self, dst: &mut [u8]) -> usize {
+    pub async fn read<'a>(&'a self, dst: &'a mut [u8]) -> usize {
         let offset = self.seek.get();
         // TODO: read from inode
         let inode = self.file.get_inode();
-        let changed = inode.read(offset, dst);
+        let changed = await!(inode.read(offset, dst));
         self.seek.set(offset + changed);
         changed
     }
 
-    pub fn write(&mut self, src: &[u8]) -> usize {
+    pub async fn write<'a>(&'a mut self, src: &'a [u8]) -> usize {
         let offset = self.seek.get();
         // TODO: write to inode
         let inode = self.file.get_inode();
-        let changed = inode.write(offset, src);
+        let changed = await!(inode.write(offset, src));
         self.seek.set(offset + changed);
         changed
     }

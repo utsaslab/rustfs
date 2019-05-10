@@ -15,12 +15,15 @@ use std::path::Path;
 use std::process;
 use std::thread;
 use std::rc::Rc;
+use std::cell::{Cell, RefCell};
 
 use crate::constants::{
     DEFAULT_SERVER1_SOCKET_PATH, DEFAULT_SERVER2_SOCKET_PATH, FS_MKFS, FS_OPEN, FS_SHUTDOWN,
 };
 
-pub static mut fs_internal: Option<FsInternal> = None;
+//pub static mut fs_internal: Option<FsInternal> = None;
+pub type RcFsInternal = Rc<RefCell<Box<FsInternal>>>;
+pub static mut fs_internal: RcFsInternal = Rc::new(RefCell::new(Box::new(mem::uninitialized())));
 
 #[derive(PartialEq, Debug, Clone, Copy)]
 enum FsOps {
@@ -196,14 +199,14 @@ impl FsInternal {
         let device = Device::new();
         let blk_size = device.blk_size();
         unsafe {
-            fs_internal = Some(FsInternal {
+            fs_internal = Rc::new(RefCell::new(Box::new( FsInternal{
                 device: device,
                 inode_base: 3 * blk_size,
                 data_base: 3 * blk_size + INODE_SIZE * blk_size * 8,
                 inode_bitmap: Bitmap::new(blk_size, blk_size),
                 data_bitmap: Bitmap::new(2 * blk_size, blk_size),
                 //root: None,
-            });
+            })));
         }
         // Let's persistent the FS structure onto disk
         let zero_buf = spdk_rs::env::dma_zmalloc(device.blk_size(), device.buf_align());
@@ -224,7 +227,7 @@ impl FsInternal {
     }
 
     pub async fn alloc_block() -> usize {
-        let fs = fs_internal.unwrap();
+        let fs = fs_internal.into_inner();
         let index = fs.data_bitmap.find().unwrap();
         let offset = index * fs.device.blk_size() + fs.data_base;
         let zero_buf = spdk_rs::env::dma_zmalloc(fs.device.blk_size(), fs.device.buf_align());
@@ -232,9 +235,8 @@ impl FsInternal {
         offset / fs.device.blk_size()
     }
 
-
     async fn mount() -> Result<(), Error> {
-        let fs = fs_internal.unwrap();
+        let fs = fs_internal.into_inner();
         let mut read_buf = spdk_rs::env::dma_zmalloc(fs.device.blk_size(), fs.device.buf_align());
         await!(fs.device.read(
             &mut read_buf,
@@ -260,7 +262,7 @@ impl FsInternal {
         // let root_inode: Inode;
         // root_inode.read_inode();
         // self.make_root(root_inode);
-        Ok(())
+        Ok(())            
     }
 
     // fn make_root(&mut self, root_inode: Inode<'r>) {
