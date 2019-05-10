@@ -10,11 +10,11 @@ use std::string::String;
 
 pub trait DirectoryHandle<'r>: Sized {
     fn is_dir(&self) -> bool;
-    fn insert(&mut self, name: &'r str, file: Self);
-    fn remove(&mut self, name: &'r str);
-    fn get(&self, name: &'r str) -> Option<Self>;
-    fn read_dir(&mut self);
-    fn write_dir(&self);
+    async fn insert(&mut self, name: &'r str, file: Self);
+    async fn remove(&mut self, name: &'r str);
+    async fn get(&self, name: &'r str) -> Option<Self>;
+    async fn read_dir(&mut self);
+    async fn write_dir(&self);
 }
 
 impl<'r> DirectoryHandle<'r> for File<'r> {
@@ -25,14 +25,14 @@ impl<'r> DirectoryHandle<'r> for File<'r> {
         }
     }
 
-    fn insert(&mut self, name: &'r str, file: File<'r>) {
+    async fn insert(&mut self, name: &'r str, file: File<'r>) {
         let mut dc = match self{
              &mut Directory(dir_content) => dir_content,
              _ => panic!("not a dir"),
         };
         match dc.entries {
              None => { 
-                 &self.read_dir();
+                 await!(self.read_dir());
                  dc = match self {
                     &mut Directory(dir_content) => dir_content,
                     _ => panic!("not a dir"),
@@ -45,14 +45,14 @@ impl<'r> DirectoryHandle<'r> for File<'r> {
         self.write_dir();
     }
 
-    fn remove(&mut self, name: &'r str) {
+    async fn remove(&mut self, name: &'r str) {
         let dc = match self{
              &mut Directory(dir_content) => dir_content,
              _ => panic!("not a dir"),
         };
         match dc.entries {
              None => { 
-                 &self.read_dir();
+                 await!(self.read_dir());
                  dc = match self {
                     &mut Directory(dir_content) => dir_content,
                     _ => panic!("not a dir"),
@@ -68,14 +68,14 @@ impl<'r> DirectoryHandle<'r> for File<'r> {
         // unimplemented!();
     }
 
-    fn get(&self, name: &'r str) -> Option<File<'r>> {
+    async fn get(&self, name: &'r str) -> Option<File<'r>> {
         let dc = match self{
              &Directory(dir_content) => dir_content,
              _ => panic!("not a dir"),
         };
         match dc.entries {
              None => { 
-                 &self.read_dir();
+                 await!(self.read_dir());
                  dc = match self {
                     &Directory(dir_content) => dir_content,
                     _ => panic!("not a dir"),
@@ -95,7 +95,7 @@ impl<'r> DirectoryHandle<'r> for File<'r> {
     }
 
     // read from disk
-    fn read_dir(&mut self){
+    async fn read_dir(&mut self){
         let mut dc = match self{
              &mut Directory(dir_content) => dir_content,
              _ => panic!("not a dir"),
@@ -106,7 +106,7 @@ impl<'r> DirectoryHandle<'r> for File<'r> {
         };
         let data:Vec<u8> = vec![0; dc.inode.size()]; 
         let read_buf = &mut data[..];
-        dc.inode.read(0, &mut read_buf);
+        await!(dc.inode.read(0, &mut read_buf));
         let iters:usize = dc.inode.size() / 128;
         for i in 0..(iters+1) {
             let inum: usize;
@@ -117,8 +117,8 @@ impl<'r> DirectoryHandle<'r> for File<'r> {
                 name = str::from_utf8(&read_buf[8..128]).expect("Found invalid UTF-8");
                 name = name.trim_matches(char::from(0));
             }
-            let curr_inode = Inode::new(dc.inode.fs, 0, inum);
-            curr_inode.read_inode();
+            let curr_inode = Inode::new(0, inum);
+            await!(curr_inode.read_inode());
             let curr_file = match curr_inode.dirtype {
                 DIR_TYPE => Directory(DirectoryContent{
                     entries: None,
@@ -132,7 +132,7 @@ impl<'r> DirectoryHandle<'r> for File<'r> {
     }
 
     // write to disk
-    fn write_dir(&self) {
+    async fn write_dir(&self) {
         let dc = match self{
              &Directory(dir_content) => dir_content,
              _ => panic!("not a dir"),
@@ -164,6 +164,6 @@ impl<'r> DirectoryHandle<'r> for File<'r> {
                 }
             }
         }
-        dc.inode.write(0, &write_buf);
+        await!(dc.inode.write(0, &write_buf));
     }
 }
