@@ -285,9 +285,9 @@ impl Inode {
             };
 
             let page = self.get_page(start + i);
-            let pg_offset = self.fs.data_base + page * blk_size;
-            let mut read_buf = spdk_rs::env::dma_zmalloc(self.fs.device.blk_size(), 0);
-            self.fs.device.read(&mut read_buf, pg_offset, blk_size);
+            let pg_offset = fs.data_base + page * blk_size;
+            let mut read_buf = spdk_rs::env::dma_zmalloc(fs.device.blk_size(), 0);
+            fs.device.read(&mut read_buf, pg_offset, blk_size);
             let disk_page = read_buf.read_bytes(blk_size);
             // TODO: check compatability here
 
