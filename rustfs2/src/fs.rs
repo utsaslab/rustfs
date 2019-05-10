@@ -14,10 +14,14 @@ use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::Path;
 use std::process;
 use std::thread;
+use std::rc::Rc;
 
 use crate::constants::{
     DEFAULT_SERVER1_SOCKET_PATH, DEFAULT_SERVER2_SOCKET_PATH, FS_MKFS, FS_OPEN, FS_SHUTDOWN,
 };
+
+// A global reference to device struct
+static mut dev: Option<Device> = None;
 
 #[derive(PartialEq, Debug, Clone, Copy)]
 enum FsOps {
@@ -94,8 +98,6 @@ fn handle_server1(stream: UnixStream) -> FsOps {
 
 #[allow(unused_variables)]
 async fn start_server2(poller: spdk_rs::io_channel::PollerHandle) {
-    let device = Device::new();
-
     let listener = match UnixListener::bind(DEFAULT_SERVER2_SOCKET_PATH) {
         Ok(sock) => sock,
         Err(e) => {
@@ -103,10 +105,15 @@ async fn start_server2(poller: spdk_rs::io_channel::PollerHandle) {
             return;
         }
     };
+    // We initialize FS both in memory and on disk
+    match await!(FsInternal::mkfs()) {
+        Ok(_) => {}
+        Err(error) => panic!("{:?}", error)
+    };
     for stream in listener.incoming() {
         match stream {
             Ok(stream) => {
-                // at least a async call to open can work but it is not right because we can now only handle one client at a time.
+                // At least a async call to open can work but it is not right because we can now only handle one client at a time.
                 // This might cause problem as if the application directly talks to server2, then there is only one socket available
                 // and thus, the request first connected gets advantage: we always wait for its requests until it disconnected.
                 // This limitation majorly due to our SPDK async has to poll on the current thread (i.e., cannot poll in different thread;
@@ -118,12 +125,10 @@ async fn start_server2(poller: spdk_rs::io_channel::PollerHandle) {
                         FS_OPEN => match await!(FsInternal::open()) {
                             Ok(_) => {}
                             Err(error) => panic!("{:?}", error),
-                        },
-                        FS_SHUTDOWN => break,
-                        FS_MKFS => match await!(FsInternal::mkfs()) {
-                            Ok(_) => {}
-                            Err(error) => panic!("{:?}", error),
                         }
+                        FS_SHUTDOWN => break,
+                        // User shouldn't really call mkfs() themselves; it is done by new() automatically                        
+                        FS_MKFS => {},                      
                         _ => {}
                     };
                 }
@@ -186,7 +191,10 @@ impl FsInternal {
 
     /// mkfs()
     async fn mkfs() -> Result<(), Error> {
-        let device = Device::new();
+        unsafe {
+            dev = Some(Device::new());
+        }
+        let device = dev.unwrap();
         let blk_size = device.blk_size();
         // FS {
         //     device: device,
@@ -252,11 +260,6 @@ impl FS {
         let mut stream = UnixStream::connect(DEFAULT_SERVER1_SOCKET_PATH).unwrap();
         stream.write_all(FS_OPEN.as_bytes()).unwrap();
         0
-    }
-
-    /// mkfs()
-    pub fn mkfs() {
-        unimplemented!();
     }
 
     /// Shutdown FS
