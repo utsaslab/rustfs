@@ -73,6 +73,42 @@ impl<'r> Inode<'r> {
         }
     }
 
+    pub fn read_file_from_inum(inum: usize) -> File {
+        let device = dev.unwrap();
+        let inode_base = fs_internal.unwrap().inode_base;
+        let blk_size = device.blk_size();
+        let offset = inode_base + inum * INODE_SIZE;
+        let blk = offset / blk_size;
+        let mut read_buf = spdk_rs::env::dma_zmalloc(blk_size, device.blk_align());
+        await!(device.read(&read_buf, blk, blk_size))?;
+        let buf = read_buf.read_bytes(blk_size);
+        let mut content = &buf[blk_offset..blk_offset + INODE_SIZE];
+        let inode:Inode;
+        unsafe {
+            let dirtype = mem::transmute::<[u8; 8], usize>(*array_ref![content, 0, 8]);
+            let size = mem::transmute::<[u8; 8], usize>(*array_ref![content, 8, 8]);
+            let single = mem::transmute::<[u8; 8], usize>(*array_ref![content, 16, 8]);
+            let double = mem::transmute::<[u8; 8], usize>(*array_ref![content, 24, 8]);
+            inode = Inode {
+                dirtype: dirtype,
+                size: size,
+                single: Some(single),
+                double: Some(double),
+            }
+        }
+        match dirtype{
+            DIR_TYPE => { 
+                let dir_content = DirectoryContent{
+                    entries: None,
+                    inode: inode,
+                };
+                Directory(dir_content)
+            },
+            FILE_TYPE => DataFile(Inode),
+            _ => panic!("unknown dirtype {}", dirtype)
+        }
+    }
+
     fn parse_entry(raw_read: &[u8], index: usize) -> usize {
         let start = index * 8;
         let content = &raw_read[start..start + 8];
