@@ -15,7 +15,7 @@ toml = "0.4.10"
 futures-await = "0.1"
 utils_rustfs = { package = "utils", path="../utils"}
 log = "0.4"
-env_logger = "0.6.0"
+env_logger = "0.7.1"
 libc = "0.2"
 colored = "1.7"
 sha2 = "0.8.0"
