@@ -10,7 +10,7 @@ failure = "0.1.2"
 libc = "0.2.43"
 hamcrest2 = "0.2.3"
 tokio = { version = "0.1.13", features = ["async-await-preview"]}
-futures = "0.1.25"
+futures = "0.3.6"
 futures_new = { package = "futures-preview", version = "0.3.0-alpha.10"}
 tokio-async-await = "0.1.4"
 log = "0.4.6"
