@@ -1,0 +1,28 @@
+version: 2
+updates:
+- package-ecosystem: cargo
+  directory: "/benchmarks"
+  schedule:
+    interval: daily
+    time: "11:00"
+  open-pull-requests-limit: 10
+- package-ecosystem: cargo
+  directory: "/spdk-rs"
+  schedule:
+    interval: daily
+    time: "11:00"
+  open-pull-requests-limit: 10
+  ignore:
+  - dependency-name: futures
+    versions:
+    - 0.3.12
+    - 0.3.13
+  - dependency-name: env_logger
+    versions:
+    - 0.8.2
+- package-ecosystem: cargo
+  directory: "/rustfs"
+  schedule:
+    interval: daily
+    time: "11:00"
+  open-pull-requests-limit: 10
