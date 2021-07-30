@@ -4,7 +4,7 @@ version = "0.1.0"
 authors = ["xxks-kkk <ferrishu3886@gmail.com>"]
 
 [dependencies]
-time = "0.1"
+time = "0.3"
 rand = "0.3"
 spdk-rs = { path="../spdk-rs"}
 libc = "0.2"
